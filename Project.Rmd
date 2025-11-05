@@ -1,0 +1,30 @@
+---
+title: "Project"
+author: "Theo and Thomas"
+date: "October 2025"
+output:
+  pdf_document:
+    toc: false
+    number_sections: false
+fontsize: 11pt
+geometry: margin=1in
+urlcolor: blue
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 6, fig.height = 4)
+library(tidyverse)
+library(knitr)
+library(readxl)
+library(MASS)
+library(dplyr)
+library(car)
+library(broom)
+library(GGally)
+```
+
+
+```{r}
+#Beginning of project
+#Pushing again
+```
