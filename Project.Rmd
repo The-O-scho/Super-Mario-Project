@@ -29,4 +29,33 @@ library(GGally)
 World_one_one = read.csv("World 1-1 Data.csv")
 sum(World_one_one[-1,]) #Data checks out
 
+# Create a time index since we don't have other predictors
+World_one_one$time = 1:nrow(World_one_one)
+
+# Fit a Poisson GLM with time as predictor
+pois_glm = glm(value ~ time, data = World_one_one, family = poisson)
+
+# View summary
+summary(pois_glm)
+
+# Test against null model (intercept only)
+null_model = glm(value ~ 1, data = World_one_one, family = poisson)
+chi_stat = deviance(null_model) - deviance(pois_glm)
+df_diff = df.residual(null_model) - df.residual(pois_glm)
+p_value = 1 - pchisq(chi_stat, df_diff)
+#P-val of 1 
+
+anova(null_model, pois_glm)
+
+# Goodness of fit test
+gof_p_value = 1 - pchisq(deviance(pois_glm), df.residual(pois_glm))
+
+# Check for overdispersion
+#Variance should equal mean for Poisson
+# Plot fitted vs observed
+plot(log(fitted(pois_glm)), log((World_one_one$value - fitted(pois_glm))^2),
+     xlab = expression(hat(lambda)), 
+     ylab = expression((y - hat(lambda))^2),
+     main = "Variance vs Mean Plot")
+abline(0, 1)
 ```
