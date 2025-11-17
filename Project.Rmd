@@ -23,39 +23,74 @@ library(broom)
 library(GGally)
 ```
 
+```{r}
+World_one_one = read.csv("World 1-1 Data.csv")
+World_one_two = read.csv("World 1-2 Data.csv")
+World_four_one = read.csv("World 4-1 Data.csv")
+World_four_two = read.csv("World 4-2 Data.csv")
+World_eight_one = read.csv("World 8-1 Data.csv")
+World_eight_two = read.csv("World 8-2 Data.csv")
+World_eight_three = read.csv("World 8-3 Data.csv")
+World_eight_four = read.csv("World 8-4 Data.csv")
+
+data = cbind(
+  World_one_one,
+  World_one_two,
+  World_four_one,
+  World_four_two,
+  World_eight_one,
+  World_eight_two,
+  World_eight_three,
+  World_eight_four
+)
+names(data) = c("W1_1", "W1_2", "W4_1", "W4_2", "W8_1", "W8_2", "W8_3", "W8_4")
+glimpse(data)
+```
 
 ```{r}
-#Read in some of the the data for testing
-World_one_one = read.csv("World 1-1 Data.csv")
-sum(World_one_one[-1,]) #Data checks out
+# Build Poisson regression model:
+pois_8_4 = glm(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, data   = data, family = poisson)
 
-# Create a time index since we don't have other predictors
-World_one_one$time = 1:nrow(World_one_one)
+# Look at basic model output (no interpretation here)
+summary(pois_8_4)
 
-# Fit a Poisson GLM with time as predictor
-pois_glm = glm(value ~ time, data = World_one_one, family = poisson)
+# (Optional) compare to null model and basic GOF checks, following class notes
+null_pois_8_4 = glm(W8_4 ~ 1, data = data, family = poisson)
 
-# View summary
-summary(pois_glm)
+# Likelihood ratio test vs null
+anova(null_pois_8_4, pois_8_4, test = "Chisq")
 
-# Test against null model (intercept only)
-null_model = glm(value ~ 1, data = World_one_one, family = poisson)
-chi_stat = deviance(null_model) - deviance(pois_glm)
-df_diff = df.residual(null_model) - df.residual(pois_glm)
-p_value = 1 - pchisq(chi_stat, df_diff)
-#P-val of 1 
-
-anova(null_model, pois_glm)
-
-# Goodness of fit test
-gof_p_value = 1 - pchisq(deviance(pois_glm), df.residual(pois_glm))
-
-# Check for overdispersion
-#Variance should equal mean for Poisson
-# Plot fitted vs observed
-plot(log(fitted(pois_glm)), log((World_one_one$value - fitted(pois_glm))^2),
-     xlab = expression(hat(lambda)), 
-     ylab = expression((y - hat(lambda))^2),
-     main = "Variance vs Mean Plot")
-abline(0, 1)
+#Poisson doesn't look very good, binomial is next
 ```
+
+```{r}
+# Fit logistic regression model
+logit_8_4 = glm(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, data   = data, family = binomial(link = "logit"))
+
+summary(logit_8_4)
+
+# Null (intercept-only) model
+null_logit_8_4 = glm(W8_4 ~ 1, data = data, family = binomial(link = "logit"))
+
+anova(null_logit_8_4, logit_8_4, test = "Chisq")
+
+#binomial doesnt look good either
+```
+
+```{r}
+#Negative binomial because its success into success into success that makes it to the last stage
+nb_model = glm.nb(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, data = data)
+
+summary(nb_model)
+
+```
+
+
+```{r}
+#logistic regression with ZIP is best bet, doing research now
+
+```
+
+
+
+
