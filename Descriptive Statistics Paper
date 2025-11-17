@@ -1,0 +1,90 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\setstretch{1.1}
+\pagenumbering{gobble}
+
+\begin{document}
+
+\noindent \textbf{STAT 333 Final Project}  \\
+\textbf{Student:} Duc Huy Nguyen (Thomas), Theo Schouten \\
+\textbf{Date:} \today \\
+\textbf{Subject:} Deliverable 2, Descriptive Statistical Analysis
+
+\vspace{1em}
+
+\noindent \textbf{Overview:} \\
+This paper summarizes our preliminary findings of the dataset in order to serve two perposes:
+\begin{itemize}
+    \item Predicting whether a given Super Mario run will be the new world record (WR)
+    \item Predicting when top speed runners will be able to reach the theoretical tool-assisted speedrun time.
+\end{itemize}
+
+
+\vspace{0.8em}
+
+\noindent \textbf{Descriptive Statistics and Key Findings} \\
+Below is a summary of the key statistics around this study.
+\begin{itemize}
+    \item Summary statistics of key variables (mean, median, variance, ranges), including:
+    \begin{itemize}
+        \item Daily number of runs submitted
+        \item Number of attempts by top runners
+        \item Distribution of completion times
+        \item Historical time gaps between world records
+    \end{itemize}
+    \item Visualizations used (not shown here but referenced):
+    \begin{itemize}
+        \item Histogram of run submission counts
+        \item Time-series plot of best run times over months/years
+        \item Boxplot comparing run times of top 10 runners vs. the field
+    \end{itemize}
+    \item Identification of trends:
+    \begin{itemize}
+        \item Whether record attempts cluster at certain periods
+        \item How the frequency of record-breaking events changes over time
+        \item Whether top-runner activity spikes before records
+    \end{itemize}
+    \item Initial correlations between predictors and the binary outcome (record vs. no record).
+\end{itemize}
+
+\vspace{0.8em}
+
+\noindent \textbf{Interpretation in Context} \\
+In this model:
+\begin{itemize}[leftmargin=1.2em]
+    \item We interpret which descriptive patterns suggest higher likelihood of a record.
+    \item We explain how variables such as runner activity, submission volume, and historical progression
+    reflect underlying skill improvements or luck factors.
+    \item We highlight any surprising findings, such as long plateaus without records or sudden bursts of progress.
+    \item We discuss data limitations (missing values, uneven sampling across years, changes in category rules).
+\end{itemize}
+
+\vspace{0.8em}
+
+\noindent \textbf{Recommendations:}
+\begin{itemize}[leftmargin=1.2em]
+    \item Which variables should be included in the predictive model based on descriptive insights.
+    \item Whether transformations (log-scaling submissions, differencing times, etc.) appear necessary.
+    \item Steps to clean or refine the dataset before modeling.
+    \item Suggestions for improving predictive performance such as adding runner-specific features.
+\end{itemize}
+
+\vspace{0.8em}
+
+\noindent \textbf{Appendix:}
+\begin{itemize}[leftmargin=1.2em]
+    \item \textbf{Model:}
+\begin{verbatim}
+# (Example placeholder code—replace with your R/Python descriptive analysis)
+summary(data)
+hist(data$submissions)
+plot(data$date, data$best_time, type="l")
+cor(data[, c("submissions","top_runner_attempts","record_flag")])
+\end{verbatim}
+
+\end{itemize}
+
+\end{document}

@@ -19,3 +19,4 @@ grid(nx = NULL, ny = NULL, col = "gray", lty = "dotted")
 delta_wr <- diff(wr$Seconds)
 delta_time <- diff(wr$Time)
 rate <- delta_wr / delta_time
+
