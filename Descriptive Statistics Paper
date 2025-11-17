@@ -1,0 +1,90 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\setstretch{1.1}
+\pagenumbering{gobble}
+
+\begin{document}
+
+\noindent \textbf{STAT 333 Lab 2}  \\
+\textbf{Student:} Duc Huy Nguyen (Thomas) \\
+\textbf{Date:} \today \\
+\textbf{Subject:} Obstacle Course Performance Recommendations for Cadets
+
+\vspace{1em}
+
+\noindent \textbf{Overview:} \\
+This memorandum examines whether taller cadets have an advantage on the obstacle course. Using a regression with height as the outcome, we tested whether physical performance measures (IOCT time, APFT score, athlete status), as well as gender, are associated with height. If performance predicts height, it suggests that different height may imply different performance.
+
+\vspace{0.8em}
+
+\noindent \textbf{Model Comparison and Findings:} \\
+We tested one model for this study.
+\begin{itemize}
+    \item The model predicts cadet height based on the composite APFT score, IOCT time, gender, and college athlete status. 
+    \item This model indicates that only \textbf{gender} is a significant predictor. We don't have enough evidence to prove that APFT score, college athlete status, and IOCT time are significant variables in estimating height. 
+    \item Individual obstacle scores such as push-up, run, and sit-up are parts of the APFT score; they are excluded from the model to prevent double-counting.
+    \item Other factors, such as \textbf{age}, may influence both height and APFT score. Younger cadets may still be growing, while older or more experienced cadets may perform better because they are familiar with the obstacles. Often known as confounding variables, these factors can hide the true relationship between variables and lead to misleading conclusions about cause and effect.
+\end{itemize} 
+
+\vspace{0.8em}
+
+\noindent \textbf{Interpretation of Parameters:} \\
+In this model:
+\begin{itemize}[leftmargin=1.2em]
+    \item There are no factors that are significant in estimating cadet height, except for \textbf{gender}. It is very likely that a male cadet is about \textbf{4} to \textbf{6} inches taller than a female cadet with similar performance.
+    \item There is no strong evidence that multiple factors in the model are so closely related that it is hard to tell which one is truly affecting the outcome (multicollinearity).
+\end{itemize}
+
+\vspace{0.8em}
+
+\noindent \textbf{Recommendations:}
+\begin{itemize}[leftmargin=1.2em]
+    \item Overall, the current APFT score, which is based on the obstacles, does not favor taller cadets; in other words, we don't have enough evidence to show that taller cadets score higher than shorter cadets. Therefore, height should not be used as a performance expectation or as a factor in evaluating cadet ability.
+    \item Consider finding the variables that may distort the relationship between height and performance. Awareness of these variables is important to ensure an accurate model in the future.
+\end{itemize}
+
+\vspace{0.8em}
+
+\noindent \textbf{Appendix:}
+\begin{itemize}[leftmargin=1.2em]
+    \item \textbf{Model:}
+    \[
+        \text{Height} = \beta_0 + \beta_1 \cdot \text{IOCT Time} + \beta_2 \cdot \text{APFT Score} + \beta_{\text{Sex}} + \beta_{\text{CS}}
+    \]
+    Adjusted $R^2 = 0.43$ \\
+    \item \textbf{Other parameters:} \\
+    VIF: 
+    \begin{verbatim}
+ IOCT_Time APFT_Score        sex         CS 
+  2.110850   1.220727   2.080244   1.053370 
+    \end{verbatim}
+    
+    CI at $\alpha = 0.95$:
+    \begin{verbatim}
+                   2.5 %       97.5 %
+(Intercept) 63.262587379 70.463645769
+IOCT_Time   -0.009541612  0.004723094
+APFT_Score  -0.012516114  0.004820062
+sexM         4.147908868  5.891654102
+CS1         -0.246455724  1.060334745
+    \end{verbatim}   
+
+    \item \textbf{R code used:}
+\begin{verbatim}
+library(tidyverse)
+library(car)
+
+apft <- read.csv("~/Downloads/APFT.csv")
+apft$CS <- as.factor(apft$CS)
+
+model <- lm(height ~ IOCT_Time + APFT_Score + sex + CS, data = apft)
+vif(model)
+summary(model)
+confint(model, level = 0.95)
+\end{verbatim}
+\end{itemize}
+
+\end{document}
