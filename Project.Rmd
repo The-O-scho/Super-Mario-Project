@@ -25,7 +25,8 @@ library(GGally)
 
 
 ```{r}
-#Beginning of project
-#Pushing again
-#yes
+#Read in some of the the data for testing
+World_one_one = read.csv("World 1-1 Data.csv")
+sum(World_one_one[-1,]) #Data checks out
+
 ```
