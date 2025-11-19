@@ -31,7 +31,7 @@ abline(h = 0, col="red")
 
 # 2nd data import and cleaning
 niftski <- read.csv("~/Library/Mobile Documents/com~apple~CloudDocs/
-                    Combined Niftski Runs.csv")
+                    Combined Niftski Runs.csv") # Combined Niftski Runs.csv
 head(niftski)
 
 # Some basic statistics
