@@ -7,10 +7,11 @@ wr <- wr %>%
   mutate(Date = as.Date(Date, format = "%Y-%m-%d")) %>%
   mutate(Time = as.numeric(Date - min(Date)) + 1)
 head(wr)
+(wr)
 
 # Draw WR progression plot
 plot(wr$Time, wr$Seconds, type = "l",
-     xlab = "Days since Jun 25 2002", ylab = "WR",
+     xlab = "Days since Jun 25 2002", ylab = "WR (sec)",
      main = "WR Progression 2002-2025", lwd = 2)
 points(wr$Time, wr$Seconds, pch = 19, col = "red")
 grid(nx = NULL, ny = NULL, col = "gray", lty = "dotted")
@@ -19,4 +20,24 @@ grid(nx = NULL, ny = NULL, col = "gray", lty = "dotted")
 delta_wr <- diff(wr$Seconds)
 delta_time <- diff(wr$Time)
 rate <- delta_wr / delta_time
+rate
+summary(rate)
+
+plot(rate, type = "b",
+     ylab="Rate of WR improvement (sec/year)",
+     xlab="Record index")
+abline(h = 0, col="red")
+
+
+# 2nd data import and cleaning
+niftski <- read.csv("~/Library/Mobile Documents/com~apple~CloudDocs/
+                    Combined Niftski Runs.csv")
+head(niftski)
+
+# Some basic statistics
+for (i in 1:8)
+  print(mean(niftski[, i]))
+
+
+  
 
