@@ -66,8 +66,8 @@ The datasets consists of two datasets:
 We suggest several models that fit the goal of the project and the data:
 \begin{itemize}[leftmargin=1.2em]
     \item An ARIMA model that uses WR improvement over time (seconds per day) to predict when the WR will reach the TAS time.
-    \item Bayesian model
-    \item Firth 
+    \item Bayesian model to handle the high levels of uncertainty that comes with small probabilities.
+    \item Firth's bias reduction model using \textsf[logistf} to help with the smaller sample size due to the small chance of a world record happening.
     \item Other models as recommended and as necessary...
 \end{itemize}
 
