@@ -2,7 +2,10 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{setspace}
 \usepackage{amsmath}
+\usepackage{amsfonts}
 \usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{url}
 \setstretch{1.1}
 \pagenumbering{gobble}
 
@@ -26,65 +29,133 @@ This paper summarizes our preliminary findings of the dataset in order to serve 
 \vspace{0.8em}
 
 \noindent \textbf{Descriptive Statistics and Key Findings} \\
-Below is a summary of the key statistics around this study.
+The datasets consists of two datasets:
 \begin{itemize}
-    \item Summary statistics of key variables (mean, median, variance, ranges), including:
+    \item The first dataset records the World Record (WR) progression from the first WR ever recorded in June 25th, 2002 to the latest WR, which occurred October 22nd, 2025. It can be retrieved here: \url {https://www.speedrun.com/smb1/stats?h=Any-NTSC&x=w20p0zkn-onvvdymn.013zwgxq}
     \begin{itemize}
-        \item Daily number of runs submitted
-        \item Number of attempts by top runners
-        \item Distribution of completion times
-        \item Historical time gaps between world records
+        \item The first dataset contains the progression of the Super Mario Bros. Any\% (NTSC) World Record (WR), beginning with the earliest recorded WR on June 25, 2002 and continuing through the most recent WR on October 22, 2025. It can be accessed here: \url{https://www.speedrun.com/smb1/stats?h=Any-NTSC&x=w20p0zkn-onvvdymn.013zwgxq}
+        \item The WR has been broken \textbf{46} times by \textbf{14} different players.
+        \item The first recorded WR is \textbf{325 seconds} (5 minutes 25 seconds), set on June 25, 2002 by Aaron Collins. The current WR is \textbf{294.448 seconds} (4 minutes 54.448 seconds), set on October 22, 2025 by Niftski.
+        \item The theoretical human-limit time, i.e., the fastest time a human could possibly achieve, is \textbf{294.032 seconds} (4 minutes 54.032 seconds).
+        \item The current WR is \textbf{0.186 seconds} slower than the TAS (Tool-Assisted Speedrun) time, which corresponds to approximately \textbf{11 frames} at 60 frames per second.
+        \item The median rate of WR improvement is \textbf{-0.00184 seconds per day}, while the most recent improvement rate is \textbf{-0.00243 seconds per day}.
+        \item The WR improvement rate reflects a standard pattern of diminishing returns: as players approach the theoretical TAS limit, achieving further WR improvements becomes increasingly difficult. In other words, the remaining room for improvement steadily decreases.
     \end{itemize}
-    \item Visualizations used (not shown here but referenced):
+    \item The second dataset contains 1,353 attempts by the current WR holder, Niftski. Each attempt is split into eight major checkpoints, where 1 marks a successful completion and 0 marks a failure. The results at each checkpoint are then randomized. Refer to Table 1 in the Appendix for an overview of the data.
     \begin{itemize}
-        \item Histogram of run submission counts
-        \item Time-series plot of best run times over months/years
-        \item Boxplot comparing run times of top 10 runners vs. the field
+        \item The table below shows Niftski's success rate at each major checkpoint. \\ \\
+        \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+            \hline
+            {Checkpoint} & {1-1} & {1-2} & {4-1} & {4-2} & {8-1} & {8-2} & {8-3} & {8-4} \\ \hline
+            {Success} & {829} & {595} & {482} & {63} & {30} & {11} & {9} & {1} \\ \hline
+            {$\mathbb{P}$(Success)} & {61.27\%} & {43.98\%} & {35.62\%} & {4.66\%} & {2.22\%} & {0.81\%} & {0.67\%} & {0.07\%} \\ \hline 
+        \end{tabular} \\
+        \item There are sharp decrease in the number of successful attempts at later checkpoints. For example, success falls from \textbf{482} at 4-1 to \textbf{63} at 4-2, an \textbf{87\%} decrease. There is also a \textbf{63\%} decrease between 8-1 and 8-2. A few factors can explain these drops:
+        \begin{itemize}
+            \item More pressure and stress in later stages, which can lead to mistakes.
+            \item Higher difficulty in later stages, which increases the chance of errors.
+        \end{itemize}
     \end{itemize}
-    \item Identification of trends:
-    \begin{itemize}
-        \item Whether record attempts cluster at certain periods
-        \item How the frequency of record-breaking events changes over time
-        \item Whether top-runner activity spikes before records
-    \end{itemize}
-    \item Initial correlations between predictors and the binary outcome (record vs. no record).
+
 \end{itemize}
 
 \vspace{0.8em}
 
-\noindent \textbf{Interpretation in Context} \\
-In this model:
+\noindent \textbf{Suggestion of Statistical Model} \\
+We suggest several models that fit the goal of the project and the data:
 \begin{itemize}[leftmargin=1.2em]
-    \item We interpret which descriptive patterns suggest higher likelihood of a record.
-    \item We explain how variables such as runner activity, submission volume, and historical progression
-    reflect underlying skill improvements or luck factors.
-    \item We highlight any surprising findings, such as long plateaus without records or sudden bursts of progress.
-    \item We discuss data limitations (missing values, uneven sampling across years, changes in category rules).
+    \item An ARIMA model that uses WR improvement over time (seconds per day) to predict when the WR will reach the TAS time.
+    \item A model based on Niftski's dataset to predict whether a run will be a WR.
+    \item Other possible models.
 \end{itemize}
 
 \vspace{0.8em}
 
-\noindent \textbf{Recommendations:}
+\noindent \textbf{Limitations:}
 \begin{itemize}[leftmargin=1.2em]
-    \item Which variables should be included in the predictive model based on descriptive insights.
-    \item Whether transformations (log-scaling submissions, differencing times, etc.) appear necessary.
-    \item Steps to clean or refine the dataset before modeling.
-    \item Suggestions for improving predictive performance such as adding runner-specific features.
+    \item Research on games like \emph{Super Mario Bros.} is limited, especially in academic settings. Because of this, data on the game and its time-attack attempts is limited.
+    \item We do not have data from other competitive speedrunners and chose not to collect or publish any of their runs.
+    \item We plan to address these limits by collecting data manually based on recorded results. These results are timed with reliable stopwatches to keep the measurements consistent.
 \end{itemize}
 
 \vspace{0.8em}
 
 \noindent \textbf{Appendix:}
 \begin{itemize}[leftmargin=1.2em]
-    \item \textbf{Model:}
+    \item \textbf{R code:}
 \begin{verbatim}
-# (Example placeholder code—replace with your R/Python descriptive analysis)
-summary(data)
-hist(data$submissions)
-plot(data$date, data$best_time, type="l")
-cor(data[, c("submissions","top_runner_attempts","record_flag")])
+library(tidyverse)
+
+# Data import and cleaning
+wr <- read.csv("~/Downloads/history.csv")
+wr$Time <- NULL
+wr <- wr %>%
+  mutate(Date = as.Date(Date, format = "%Y-%m-%d")) %>%
+  mutate(Time = as.numeric(Date - min(Date)) + 1)
+head(wr)
+(wr)
+
+# Draw WR progression plot
+plot(wr$Time, wr$Seconds, type = "l",
+     xlab = "Days since Jun 25 2002", ylab = "WR (sec)",
+     main = "WR Progression 2002-2025", lwd = 2)
+points(wr$Time, wr$Seconds, pch = 19, col = "red")
+grid(nx = NULL, ny = NULL, col = "gray", lty = "dotted")
+
+# Change in WR over change in time
+delta_wr <- diff(wr$Seconds)
+delta_time <- diff(wr$Time)
+rate <- delta_wr / delta_time
+rate
+summary(rate)
+
+plot(rate, type = "b",
+     ylab="Rate of WR improvement (sec/year)",
+     xlab="Record index")
+abline(h = 0, col="red")
+
+
+# 2nd data import and cleaning
+niftski <- read.csv("~/Library/Mobile Documents/com~apple~CloudDocs/
+                    Combined Niftski Runs.csv")
+head(niftski)
+
+# Some basic statistics
+for (i in 1:8)
+  print(mean(niftski[, i]))
 \end{verbatim}
+    \item \textbf{Relevant visualizations:}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=1\textwidth]{Final Project 1.png}
+  \caption{World Record progression from 2002 to 2025.}
+  \label{fig:boxplot}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=1\textwidth]{Final Project 2.png}
+  \caption{World Record average improvement over time.}
+  \label{fig:boxplot}
+\end{figure}
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|} \hline
+Run/Stage & X1.1 & X1.2 & X4.1 & X4.2 & X8.1 & X8.2 & X8.3 & X8.4 \\ \hline 
+1 & 1 & 1 & 0 & 0 & 0 & 0 & 0 & 0 \\ \hline
+2 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\ \hline
+3 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 \\ \hline
+4 & 1 & 1 & 1 & 0 & 0 & 0 & 0 & 0 \\ \hline
+5 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\ \hline
+6 & 1 & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\ \hline
+\end{tabular}
+\caption{Overview of Niftski's runs.}
+\end{table}
+
 
 \end{itemize}
 
 \end{document}
+
