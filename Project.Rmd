@@ -50,6 +50,14 @@ glimpse(data)
 ```
 
 ```{r}
+#Over ride data with new ordered data for testing
+data = read.csv("Nifski Ordered.csv")
+glimpse(data)
+```
+
+
+
+```{r}
 # Build Poisson regression model:
 pois_8_4 = glm(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, data   = data, family = poisson)
 
@@ -96,9 +104,140 @@ zib_0 = glmmTMB(
   family = binomial(link = logit),
   data = data
 )
-#This warning means that we dont have enough data (enough 1's) to estimate this, means we can't use ZIP with binomial link = logit. 
-#Good thing to talk about in the report
+
+summary(zib_0)
+
+zib_full = glmmTMB(
+  W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3,        # count (binomial) part: intercept only
+  ziformula = ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, # zero-inflation part: intercept only
+  family = binomial(link = logit),
+  data = data
+)
+summary(zib_full)
+#no warning but still NAN p values
+``` 
+
+```{r}
+firth_8_4 = logistf(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, 
+                     data = data)
+
+summary(firth_8_4)
+
+
+
+# Create composite features
+data = data %>%
+  mutate(
+    # Total successes in early levels (W1)
+    W1_total = W1_1 + W1_2,
+    
+    # Total successes in mid levels (W4)
+    W4_total = W4_1 + W4_2,
+    
+    # Total successes in late levels (W8, excluding outcome)
+    W8_prior = W8_1 + W8_2 + W8_3,
+    
+    # Overall success rate up to W8_3
+    success_rate = (W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3) / 7
+  )
+
+# Simpler model with composite features
+firth_composite = logistf(W8_4 ~ W1_total + W4_total + W8_prior, data = data)
+summary(firth_composite) #only W_8 prior matters maybe build up just previous w_8??? idk
+
+# Or even simpler - just overall success rate
+firth_simple = logistf(W8_4 ~ success_rate, data = data)
+summary(firth_simple) #finally a significant p-val in just using success rate
 ```
+Block for testing firth_simple
+Actually a good fit, decent predictions, Nifski has around a 21% completion rate on average for all previous levels. dataset updated with predictions from this.
+
+```{r}
+library(logistf)
+library(ggplot2)
+library(dplyr)
+
+# Your model
+firth_simple = logistf(W8_4 ~ success_rate, data = data)
+summary(firth_simple)
+
+# 1. Generate predictions for your existing data
+data$predicted_prob = predict(firth_simple, type = "response")
+
+# 2. Look at predictions for different success rates
+# Create a sequence of success rates from 0 to 1
+new_data = data.frame(success_rate = seq(0, 1, by = 0.1))
+new_data$predicted_prob = predict(firth_simple, newdata = new_data, type = "response")
+
+print("Predicted probabilities of breaking world record:")
+print(new_data)
+
+# 3. Summary statistics of predictions
+cat("\nPrediction Summary:\n")
+cat("Min predicted probability:", min(data$predicted_prob), "\n")
+cat("Max predicted probability:", max(data$predicted_prob), "\n")
+cat("Mean predicted probability:", mean(data$predicted_prob), "\n")
+cat("Actual world record rate:", mean(data$W8_4), "\n")
+
+# 4. DIAGNOSTIC PLOT 1: Predicted probabilities vs actual outcomes
+ggplot(data, aes(x = predicted_prob, fill = as.factor(W8_4))) +
+  geom_histogram(position = "identity", alpha = 0.6, bins = 30) +
+  labs(title = "Distribution of Predicted Probabilities",
+       x = "Predicted Probability of World Record",
+       y = "Count",
+       fill = "Actual WR") +
+  scale_fill_manual(values = c("0" = "red", "1" = "green"),
+                    labels = c("No WR", "WR")) +
+  theme_minimal()
+
+
+
+# 6. DIAGNOSTIC PLOT 3: Success rate vs probability curve
+ggplot(data, aes(x = success_rate, y = predicted_prob)) +
+  geom_point(aes(color = as.factor(W8_4)), alpha = 0.5) +
+  geom_smooth(method = "loess", se = TRUE, color = "blue") +
+  labs(title = "Success Rate vs Predicted Probability",
+       x = "Success Rate (prior levels)",
+       y = "Predicted Probability of World Record",
+       color = "Actual WR") +
+  scale_color_manual(values = c("0" = "red", "1" = "green"),
+                     labels = c("No WR", "WR")) +
+  theme_minimal()
+
+# 7. ROC CURVE and AUC (measure of discrimination)
+library(pROC)
+roc_obj = roc(data$W8_4, data$predicted_prob)
+auc_value = auc(roc_obj)
+
+plot(roc_obj, main = paste("ROC Curve (AUC =", round(auc_value, 3), ")"))
+cat("\nAUC (Area Under Curve):", auc_value, "\n")
+cat("Interpretation: AUC > 0.7 = acceptable, > 0.8 = excellent\n")
+
+
+# 9. Hosmer-Lemeshow test (goodness of fit)
+library(ResourceSelection)
+hl_test = hoslem.test(data$W8_4, data$predicted_prob, g = 10)
+print(hl_test)
+cat("Hosmer-Lemeshow test: p >0.05 indicates good fit\n")
+
+# 10. Example predictions for specific scenarios
+example_scenarios = data.frame(
+  scenario = c("Beginner", "Intermediate", "Advanced", "Expert"),
+  success_rate = c(0.2, 0.5, 0.8, 0.95)
+)
+
+example_scenarios$WR_probability = predict(firth_simple, 
+                                            newdata = example_scenarios, 
+                                            type = "response")
+
+cat("\n Example Predictions \n")
+print(example_scenarios)
+
+
+```
+
+
+
 Bayesian Start Here
 
 
@@ -106,24 +245,24 @@ Bayesian Start Here
 #Final model can output probability of WR on next attempt given current performance...
 #This can be used to simulate the Probability of a WR within N attempts 1 - (1 - p_hat)^N
 #bayesian model building
-stages <- c("W1_1", "W1_2", "W4_1", "W4_2", "W8_1", "W8_2", "W8_3", "W8_4")
-stage_stats <- tibble()
+stages = c("W1_1", "W1_2", "W4_1", "W4_2", "W8_1", "W8_2", "W8_3", "W8_4")
+stage_stats = tibble()
 
 for (k in seq_along(stages)) {
-  stage_name <- stages[k]
+  stage_name = stages[k]
   
   # "Reached" this stage = succeeded on all previous stages
   if (k == 1) {
-    reached <- rep(TRUE, nrow(data))
+    reached = rep(TRUE, nrow(data))
   } else {
-    prev_stages <- stages[1:(k-1)]
-    reached <- apply(data[, prev_stages, drop = FALSE] == 1, 1, all)
+    prev_stages = stages[1:(k-1)]
+    reached = apply(data[, prev_stages, drop = FALSE] == 1, 1, all)
   }
   
-  n_k <- sum(reached)                              # number of attempts that reached this stage
-  y_k <- sum(data[[stage_name]][reached] == 1)     # successes at this stage
+  n_k = sum(reached)                              # number of attempts that reached this stage
+  y_k = sum(data[[stage_name]][reached] == 1)     # successes at this stage
   
-  stage_stats <- bind_rows(
+  stage_stats = bind_rows(
     stage_stats,
     tibble(
       stage     = stage_name,
@@ -153,10 +292,10 @@ stage_stats %>%
 ```
 
 ```{r}
-alpha0 <- 1
-beta0  <- 1
+alpha0 = 1
+beta0  = 1
 
-stage_stats <- stage_stats %>%
+stage_stats = stage_stats %>%
   mutate(
     alpha_post = alpha0 + success_y,
     beta_post  = beta0 + reached_n - success_y,
@@ -187,23 +326,23 @@ stage_stats %>%
 ```{r}
 set.seed(123)
 
-n_sims <- 100000
+n_sims = 100000
 
 # Draw samples from each stage's posterior
-p_draws_list <- lapply(seq_len(nrow(stage_stats)), function(i) {
-  a <- stage_stats$alpha_post[i]
-  b <- stage_stats$beta_post[i]
+p_draws_list = lapply(seq_len(nrow(stage_stats)), function(i) {
+  a = stage_stats$alpha_post[i]
+  b = stage_stats$beta_post[i]
   rbeta(n_sims, a, b)
 })
 
 # Convert list to matrix: rows = sims, cols = stages
-p_draws_mat <- do.call(cbind, p_draws_list)
+p_draws_mat = do.call(cbind, p_draws_list)
 
 # Product across stages for each simulation = WR probability in that simulation
-wr_prob_draws <- apply(p_draws_mat, 1, prod)
+wr_prob_draws = apply(p_draws_mat, 1, prod)
 
 # Summaries
-wr_summary <- tibble(
+wr_summary = tibble(
   mean       = mean(wr_prob_draws),
   median     = median(wr_prob_draws),
   lower95    = quantile(wr_prob_draws, 0.025),
