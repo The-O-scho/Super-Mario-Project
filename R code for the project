@@ -1,7 +1,7 @@
 library(tidyverse)
 
 # Data import and cleaning
-wr <- read.csv("~/Downloads/history.csv")
+wr <- read.csv("~/Downloads/history.csv") # history.csv: Historical WR progression
 wr$Time <- NULL
 wr <- wr %>%
   mutate(Date = as.Date(Date, format = "%Y-%m-%d")) %>%
@@ -31,7 +31,7 @@ abline(h = 0, col="red")
 
 # 2nd data import and cleaning
 niftski <- read.csv("~/Library/Mobile Documents/com~apple~CloudDocs/
-                    Combined Niftski Runs.csv") # Combined Niftski Runs.csv
+                    Combined Niftski Runs.csv") # Combined Niftski Runs.csv 
 head(niftski)
 
 # Some basic statistics
