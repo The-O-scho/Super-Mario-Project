@@ -234,6 +234,16 @@ cat("\n Example Predictions \n")
 print(example_scenarios)
 
 
+target_row = data[
+  data$W1_1 == 1 &
+  data$W1_2 == 1 &
+  data$W4_1 == 1 &
+  data$W4_2 == 1 &
+  data$W8_1 == 1 &
+  data$W8_2 == 1 &
+  data$W8_3 == 1,
+]
+
 ```
 
 
