@@ -41,7 +41,7 @@ The datasets consists of two datasets:
         \item The median rate of WR improvement is \textbf{-0.00184 seconds per day}, while the most recent improvement rate is \textbf{-0.00243 seconds per day}.
         \item The WR improvement rate reflects a standard pattern of diminishing returns: as players approach the theoretical TAS limit, achieving further WR improvements becomes increasingly difficult. In other words, the remaining room for improvement steadily decreases.
     \end{itemize}
-    \item The second dataset contains 1,353 attempts by the current WR holder, Niftski. Each attempt is split into eight major checkpoints, where 1 marks a successful completion and 0 marks a failure. The results at each checkpoint are then randomized. Refer to Table 1 in the Appendix for an overview of the data.
+    \item The second dataset contains 1,353 attempts by the current WR holder, Niftski. Each attempt is split into eight major checkpoints, where 1 marks a successful completion and 0 marks a failure. Refer to Table 1 in the Appendix for an overview of the data.
     \begin{itemize}
         \item The table below shows Niftski's success rate at each major checkpoint. \\ \\
         \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
@@ -54,6 +54,7 @@ The datasets consists of two datasets:
         \begin{itemize}
             \item More pressure and stress in later stages, which can lead to mistakes.
             \item Higher difficulty in later stages, which increases the chance of errors.
+            \item Success on a later level depends on success on earlier levels.
         \end{itemize}
     \end{itemize}
 
@@ -65,9 +66,11 @@ The datasets consists of two datasets:
 We suggest several models that fit the goal of the project and the data:
 \begin{itemize}[leftmargin=1.2em]
     \item An ARIMA model that uses WR improvement over time (seconds per day) to predict when the WR will reach the TAS time.
-    \item A model based on Niftski's dataset to predict whether a run will be a WR.
-    \item Other possible models.
+    \item Bayesian model
+    \item Firth 
+    \item Other models as recommended and as necessary...
 \end{itemize}
+
 
 \vspace{0.8em}
 
@@ -84,45 +87,92 @@ We suggest several models that fit the goal of the project and the data:
 \begin{itemize}[leftmargin=1.2em]
     \item \textbf{R code:}
 \begin{verbatim}
+# Setup
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 6, fig.height = 4)
+
 library(tidyverse)
+library(readxl)
+library(MASS)
+library(car)
+library(broom)
+library(GGally)
+library(glmmTMB)
+library(logistf)
+library(pROC)
+library(ResourceSelection)
 
-# Data import and cleaning
-wr <- read.csv("~/Downloads/history.csv")
-wr$Time <- NULL
-wr <- wr %>%
-  mutate(Date = as.Date(Date, format = "%Y-%m-%d")) %>%
-  mutate(Time = as.numeric(Date - min(Date)) + 1)
-head(wr)
-(wr)
+# Load Niftski data
+data <- read.csv("Nifski Ordered.csv")
 
-# Draw WR progression plot
-plot(wr$Time, wr$Seconds, type = "l",
-     xlab = "Days since Jun 25 2002", ylab = "WR (sec)",
-     main = "WR Progression 2002-2025", lwd = 2)
-points(wr$Time, wr$Seconds, pch = 19, col = "red")
-grid(nx = NULL, ny = NULL, col = "gray", lty = "dotted")
+# Inspect data
+glimpse(data)
 
-# Change in WR over change in time
-delta_wr <- diff(wr$Seconds)
-delta_time <- diff(wr$Time)
-rate <- delta_wr / delta_time
-rate
-summary(rate)
+# Composite features
+data <- data %>%
+  mutate(
+    W1_total = W1_1 + W1_2,
+    W4_total = W4_1 + W4_2,
+    W8_prior = W8_1 + W8_2 + W8_3,
+    success_rate = (W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3)/7
+  )
 
-plot(rate, type = "b",
-     ylab="Rate of WR improvement (sec/year)",
-     xlab="Record index")
-abline(h = 0, col="red")
+# Poisson model
+pois_model <- glm(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3,
+                  data = data, family = poisson)
+summary(pois_model)
 
+# Logistic regression
+logit_model <- glm(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3,
+                   data = data, family = binomial(link = "logit"))
+summary(logit_model)
 
-# 2nd data import and cleaning
-niftski <- read.csv("~/Library/Mobile Documents/com~apple~CloudDocs/
-                    Combined Niftski Runs.csv")
-head(niftski)
+# Negative binomial
+nb_model <- glm.nb(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3,
+                   data = data)
+summary(nb_model)
 
-# Some basic statistics
-for (i in 1:8)
-  print(mean(niftski[, i]))
+# Simulate overall WR probability
+set.seed(123)
+n_sims <- 100000
+p_draws <- sapply(seq_len(nrow(stage_stats)), function(i) rbeta(n_sims,
+                                                                stage_stats$alpha_post[i],
+                                                                stage_stats$beta_post[i]))
+wr_draws <- apply(p_draws,1,prod)
+wr_summary <- tibble(mean=mean(wr_draws), median=median(wr_draws),
+                     lower95=quantile(wr_draws,0.025),
+                     upper95=quantile(wr_draws,0.975))
+print(wr_summary)
+
+# WR distribution plots
+ggplot(tibble(wr_prob=wr_draws), aes(x=wr_prob)) +
+  geom_histogram(bins=50) +
+  labs(title="WR Probability Distribution", x="P(WR per attempt)", y="Frequency") +
+  theme_bw()
+
+ggplot(tibble(log10_wr_prob=log10(wr_draws)), aes(x=log10_wr_prob)) +
+  geom_histogram(bins=50) +
+  labs(title="log10 WR Probability Distribution", x="log10 P(WR)", y="Frequency") +
+  theme_bw()
+
+# Historical WR progression
+wr <- read.csv("~/Downloads/history.csv") %>%
+  mutate(Date=as.Date(Date,"%Y-%m-%d"),
+         Time=as.numeric(Date - min(Date))+1) 
+plot(wr$Time, wr$Seconds, type="l", lwd=2, xlab="Days since start", ylab="WR (sec)",
+     main="WR Progression 2002-2025")
+points(wr$Time, wr$Seconds, pch=19, col="red")
+grid()
+
+# WR rate of change
+rate <- diff(wr$Seconds)/diff(wr$Time)
+plot(rate, type="b", ylab="Rate of WR improvement (sec/day)", xlab="Record index")
+abline(h=0,col="red")
+
+# Load Niftski run data
+niftski <- read.csv("~/Library/Mobile Documents/com~apple~CloudDocs/Combined Niftski Runs.csv")
+for(i in 1:8) print(mean(niftski[,i]))
+
 \end{verbatim}
     \item \textbf{Relevant visualizations:}
 
@@ -158,4 +208,5 @@ Run/Stage & X1.1 & X1.2 & X4.1 & X4.2 & X8.1 & X8.2 & X8.3 & X8.4 \\ \hline
 \end{itemize}
 
 \end{document}
+
 
