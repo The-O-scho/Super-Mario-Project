@@ -21,6 +21,8 @@ library(dplyr)
 library(car)
 library(broom)
 library(GGally)
+library(glmmTMB)
+library(logistf)
 ```
 
 ```{r}
@@ -88,8 +90,17 @@ summary(nb_model)
 
 ```{r}
 #logistic regression with ZIP is best bet, doing research now
-
+zib_0 = glmmTMB(
+  W8_4 ~ 1,        # count (binomial) part: intercept only
+  ziformula = ~ 1, # zero-inflation part: intercept only
+  family = binomial(link = logit),
+  data = data
+)
+#This warning means that we dont have enough data (enough 1's) to estimate this, means we can't use ZIP with binomial link = logit. 
+#Good thing to talk about in the report
 ```
+
+
 
 
 
