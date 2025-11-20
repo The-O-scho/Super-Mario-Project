@@ -27,10 +27,11 @@ library(ggplot2)
 library(ResourceSelection)
 ```
 
-
+Create Data
 ```{r}
 #Read in data (data is ordered)
 data = read.csv("Nifski Ordered.csv")
+
 # Create composite features
 data = data %>%
   mutate(
@@ -40,31 +41,28 @@ data = data %>%
 glimpse(data)
 ```
 
-
-
+Poisson
 ```{r}
 # Build Poisson regression model:
 pois_8_4 = glm(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, data   = data, family = poisson)
 
-# Look at basic model output (no interpretation here)
+
 summary(pois_8_4)
 
-# (Optional) compare to null model and basic GOF checks, following class notes
 null_pois_8_4 = glm(W8_4 ~ 1, data = data, family = poisson)
 
-# Likelihood ratio test vs null
 anova(null_pois_8_4, pois_8_4, test = "Chisq")
 
 #Poisson doesn't look very good, binomial is next
 ```
 
+logistic binomial
 ```{r}
 # Fit logistic regression model
 logit_8_4 = glm(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, data   = data, family = binomial(link = "logit"))
 
 summary(logit_8_4)
 
-# Null (intercept-only) model
 null_logit_8_4 = glm(W8_4 ~ 1, data = data, family = binomial(link = "logit"))
 
 anova(null_logit_8_4, logit_8_4, test = "Chisq")
@@ -72,6 +70,7 @@ anova(null_logit_8_4, logit_8_4, test = "Chisq")
 #binomial doesn't look good either
 ```
 
+Negative Binomial
 ```{r}
 #Negative binomial because its success into success into success that makes it to the last stage
 nb_model = glm.nb(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, data = data)
@@ -80,12 +79,12 @@ summary(nb_model)
 
 ```
 
-
+ZIP
 ```{r}
-#logistic regression with ZIP is best bet, doing research now
+#logistic binomial regression with ZIP 
 zib_0 = glmmTMB(
-  W8_4 ~ 1,        # count (binomial) part: intercept only
-  ziformula = ~ 1, # zero-inflation part: intercept only
+  W8_4 ~ 1,        
+  ziformula = ~ 1,
   family = binomial(link = logit),
   data = data
 )
@@ -93,15 +92,26 @@ zib_0 = glmmTMB(
 summary(zib_0)
 
 zib_full = glmmTMB(
-  W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3,        # count (binomial) part: intercept only
-  ziformula = ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, # zero-inflation part: intercept only
+  W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3,        
+  ziformula = ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, 
   family = binomial(link = logit),
   data = data
 )
 summary(zib_full)
 #no warning but still NAN p values, ZIP doesn't work
+
+zib_full_2 = glmmTMB(
+  W8_4 ~ success_rate,        
+  ziformula = ~ success_rate, 
+  family = binomial(link = logit),
+  data = data
+)
+
+summary(zib_full_2) #Even success_rate doesn't work
 ``` 
 
+
+Firth's bias reduction
 ```{r}
 firth_8_4 = logistf(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, 
                      data = data)
@@ -117,7 +127,7 @@ Actually a good fit, decent predictions, Nifski has around a 21% completion rate
 firth_simple = logistf(W8_4 ~ success_rate, data = data)
 summary(firth_simple)
 
-# 1. Generate predictions for your existing data
+# 1. Generate predictions for existing data
 data$predicted_prob = predict(firth_simple, type = "response")
 
 
@@ -134,13 +144,8 @@ ggplot(data, aes(x = success_rate, y = predicted_prob)) +
   theme_minimal()
 
 # 3.goodness of fit
-hl_test = hoslem.test(data$W8_4, data$predicted_prob, g = 10)
-print(hl_test)
-cat("Hosmer-Lemeshow test: p >0.05 indicates good fit\n")
-
-
-cat("\n Example Predictions \n")
-print(example_scenarios)
+hoslem.test(data$W8_4, data$predicted_prob, g = 10)
+cat("Test: p >0.05 indicates good fit\n")
 
 
 target_row = data[
@@ -154,6 +159,190 @@ target_row = data[
 ]
 target_row
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
