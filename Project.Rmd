@@ -30,7 +30,7 @@ library(ResourceSelection)
 Create Data
 ```{r}
 #Read in data (data is ordered)
-data = read.csv("Nifski Ordered.csv")
+data = read.csv("worlds_data_reordered_by_day.csv")
 
 # Create composite features
 data = data %>%
@@ -38,8 +38,40 @@ data = data %>%
     # Overall success rate up to W8_3
     success_rate = (W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3) / 7
   )
-glimpse(data)
+
+data
 ```
+
+Create time varied data
+```{r}
+# Create day–level improvement variable
+
+# 1. Compute day-level mean success rate
+day_summary = data %>%
+  group_by(Day) %>%
+  summarise(
+    day_success_rate = mean(success_rate),
+    .groups = "drop"
+  ) %>%
+  # Create numeric time index
+  mutate(
+    time_index = as.numeric(factor(Day))
+  ) %>%
+  arrange(time_index) %>%
+  # 2. Compute improvement at the day level
+  mutate(
+    day_improvement = day_success_rate - lag(day_success_rate),
+    day_cum_improvement = day_success_rate - first(day_success_rate)
+  )
+
+# 3. Join day-level improvement back into full dataset
+data = data %>%
+  left_join(day_summary, by = "Day")
+
+data
+
+```
+
 
 Poisson
 ```{r}
