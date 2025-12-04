@@ -39,49 +39,42 @@ Create world_data
 #Read in world_data  (world_data  is ordered)
 world_data   = read.csv("FINAL WORLD DATA.csv")
 
-# Create composite features
-world_data  = world_data  %>%
-  mutate(
-    # Overall success rate up to W8_3
-    success_rate = (W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3) / 7
-  )
-
 world_data 
 ```
 
-Create time varied world_data 
-```{r}
-# Create day–level improvement variable
+<!-- Create time varied world_data  -->
+<!-- ```{r} -->
+<!-- # Create day–level improvement variable -->
 
-day_summary = world_data  %>%
-  group_by(Day) %>%
-  summarise(
-    day_success_rate = mean(success_rate),
-    .groups = "drop"
-  ) %>%
+<!-- day_summary = world_data  %>% -->
+<!--   group_by(Day) %>% -->
+<!--   summarise( -->
+<!--     day_success_rate = mean(success_rate), -->
+<!--     .groups = "drop" -->
+<!--   ) %>% -->
 
-  mutate(
-    time_index = as.numeric(factor(Day))
-  ) %>%
-  arrange(time_index) %>%
+<!--   mutate( -->
+<!--     time_index = as.numeric(factor(Day)) -->
+<!--   ) %>% -->
+<!--   arrange(time_index) %>% -->
 
-  mutate(
-    day_improvement = day_success_rate - lag(day_success_rate),
-    day_cum_improvement = day_success_rate - first(day_success_rate)
-  )
-
-
-world_data  = world_data  %>%
-  left_join(day_summary, by = "Day")
-
-world_data $day_improvement[is.na(world_data $day_improvement)] = 0
-
-world_data 
-
-#Graph day_success_rate over time grouped by date to find IF there is improvement over time
+<!--   mutate( -->
+<!--     day_improvement = day_success_rate - lag(day_success_rate), -->
+<!--     day_cum_improvement = day_success_rate - first(day_success_rate) -->
+<!--   ) -->
 
 
-```
+<!-- world_data  = world_data  %>% -->
+<!--   left_join(day_summary, by = "Day") -->
+
+<!-- world_data $day_improvement[is.na(world_data $day_improvement)] = 0 -->
+
+<!-- world_data  -->
+
+<!-- #Graph day_success_rate over time grouped by date to find IF there is improvement over time -->
+
+
+<!-- ``` -->
 Create model for improvement over time
 ```{r}
 interval_data = interval_data   %>%
@@ -121,6 +114,8 @@ daily_progression = interval_data   %>%
     median_max_interval = median(max_interval_reached),
     .groups = 'drop'
   )
+
+interval_data
 ```
 
 Graphs
@@ -339,31 +334,100 @@ ggplot(interval_data_sorted, aes(x = obs_number)) +
 
 ```
 
+Model to predict probability of each individual run
+```{r}
+# Initialize empty list
+interval_models = list()
+
+# Map intervals to their corresponding world record columns
+interval_mapping = c(
+  "1" = "W1_1",
+  "2" = "W1_2", 
+  "3" = "W4_1",
+  "4" = "W4_2",
+  "5" = "W8_1",
+  "6" = "W8_2",
+  "7" = "W8_3",
+  "8" = "W8_4"
+)
+
+# Build models for intervals 1-7 (we're predicting interval 8/W8_4)
+for (interval_num in 1:7) {
+  
+  cat("\n=== Processing Interval", interval_num, "(", interval_mapping[as.character(interval_num)], ") ===\n")
+  
+  # Filter data for this specific interval
+  interval_subset = interval_data %>%
+    filter(Interval == interval_num)
+  
+  cat("Number of observations:", nrow(interval_subset), "\n")
+  cat("Success rate:", mean(interval_subset$Success), "\n")
+  
+  # Build cloglog model for this interval
+  model = glm(Success ~ DayNum, 
+              data = interval_subset,
+              family = binomial(link = "cloglog"))
+  
+  # Store the model with the world column name as key
+  world_col = interval_mapping[as.character(interval_num)]
+  interval_models[[world_col]] = model
+  
+  cat("Model successfully fit!\n")
+  print(summary(model))
+}
+
+# Now create predictions for each run in world_data
+world_data = world_data %>%
+  mutate(
+    pred_W1_1 = predict(interval_models[["W1_1"]], 
+                        newdata = data.frame(DayNum = DayNum), 
+                        type = "response"),
+    pred_W1_2 = predict(interval_models[["W1_2"]], 
+                        newdata = data.frame(DayNum = DayNum), 
+                        type = "response"),
+    pred_W4_1 = predict(interval_models[["W4_1"]], 
+                        newdata = data.frame(DayNum = DayNum), 
+                        type = "response"),
+    pred_W4_2 = predict(interval_models[["W4_2"]], 
+                        newdata = data.frame(DayNum = DayNum), 
+                        type = "response"),
+    pred_W8_1 = predict(interval_models[["W8_1"]], 
+                        newdata = data.frame(DayNum = DayNum), 
+                        type = "response"),
+    pred_W8_2 = predict(interval_models[["W8_2"]], 
+                        newdata = data.frame(DayNum = DayNum), 
+                        type = "response"),
+    pred_W8_3 = predict(interval_models[["W8_3"]], 
+                        newdata = data.frame(DayNum = DayNum), 
+                        type = "response")
+  )
+
+# Calculate overall WR probability as product of all interval probabilities
+world_data = world_data %>%
+  mutate(
+    pred_WR_prob = pred_W1_1 * pred_W1_2 * pred_W4_1 * pred_W4_2 * 
+                   pred_W8_1 * pred_W8_2 * pred_W8_3
+  )
+
+# Now use this predicted WR probability in your final model
+final_model = logistf(W8_4 ~ pred_WR_prob, data = world_data)
+summary(final_model)
+
+# Check the predictions
+world_data %>%
+  dplyr::select(DayNum, starts_with("pred_"), W8_4)
+```
+
+
+
+
 Use Predicted Success Rate from Interval Model
 ```{r}
 best_wr_model = glm(W8_4 ~ success_rate + DayNum,
                     data = world_data,
                     family = binomial(link = "cloglog"))
-best_wr_model2 = glm(W8_4 ~  DayNum,
-                    data = world_data,
-                    family = binomial(link = "cloglog"))
+#Doesnt work because of success rate
 
-summary(best_wr_model)
-summary(best_wr_model2)
-
-
-AIC(best_wr_model)
-
-
-world_data$wr_predicted_prob = predict(best_wr_model, type = "response")
-
-# Example: Predict for perfect run on Day 22
-perfect_run = data.frame(
-  success_rate = 1.0,
-  DayNum = 22
-)
-predict(best_wr_model, newdata = perfect_run, type = "response")
-anova(best_wr_model2, best_)
 
 #SCRAP SUCCESS RATE
 #Predict improvement rate
