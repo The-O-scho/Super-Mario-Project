@@ -27,89 +27,357 @@ library(ggplot2)
 library(ResourceSelection)
 ```
 
-Create Data
+Interval world_data 
 ```{r}
-#Read in data (data is ordered)
-data = read.csv("worlds_data_reordered_by_day.csv")
+interval_data = read.csv("FINAL DATA.csv")
+
+interval_data   
+```
+
+Create world_data 
+```{r}
+#Read in world_data  (world_data  is ordered)
+world_data   = read.csv("FINAL WORLD DATA.csv")
 
 # Create composite features
-data = data %>%
+world_data  = world_data  %>%
   mutate(
     # Overall success rate up to W8_3
     success_rate = (W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3) / 7
   )
 
-data
+world_data 
 ```
 
-Create time varied data
+Create time varied world_data 
 ```{r}
 # Create day–level improvement variable
 
-# 1. Compute day-level mean success rate
-day_summary = data %>%
+day_summary = world_data  %>%
   group_by(Day) %>%
   summarise(
     day_success_rate = mean(success_rate),
     .groups = "drop"
   ) %>%
-  # Create numeric time index
+
   mutate(
     time_index = as.numeric(factor(Day))
   ) %>%
   arrange(time_index) %>%
-  # 2. Compute improvement at the day level
+
   mutate(
     day_improvement = day_success_rate - lag(day_success_rate),
     day_cum_improvement = day_success_rate - first(day_success_rate)
   )
 
-# 3. Join day-level improvement back into full dataset
-data = data %>%
+
+world_data  = world_data  %>%
   left_join(day_summary, by = "Day")
 
-data
+world_data $day_improvement[is.na(world_data $day_improvement)] = 0
+
+world_data 
+
+#Graph day_success_rate over time grouped by date to find IF there is improvement over time
+
 
 ```
-
-
-Poisson
+Create model for improvement over time
 ```{r}
-# Build Poisson regression model:
-pois_8_4 = glm(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, data   = data, family = poisson)
+interval_data = interval_data   %>%
+  mutate(DayNum = as.numeric(gsub('Day_', '', Day)))
 
+world_data = world_data  %>%
+  mutate(DayNum = as.numeric(gsub('Day_', '', Day)))
 
-summary(pois_8_4)
+# Calculate success rate by day and interval
+daily_interval_success = interval_data   %>%
+  group_by(DayNum, Interval) %>%
+  summarise(
+    success_rate = mean(Success),
+    n_attempts = n(),
+    .groups = 'drop'
+  )
 
-null_pois_8_4 = glm(W8_4 ~ 1, data = data, family = poisson)
+# Calculate overall success rate by day (across all intervals)
+daily_overall_success = interval_data   %>%
+  group_by(DayNum) %>%
+  summarise(
+    overall_success_rate = mean(Success),
+    total_attempts = n(),
+    .groups = 'drop'
+  )
 
-anova(null_pois_8_4, pois_8_4, test = "Chisq")
-
-#Poisson doesn't look very good, binomial is next
+# Calculate how far Nifski get on average each day
+daily_progression = interval_data   %>%
+  group_by(DayNum, Run) %>%
+  summarise(
+    max_interval_reached = max(Interval[Success == 1]),
+    .groups = 'drop'
+  ) %>%
+  group_by(DayNum) %>%
+  summarise(
+    avg_max_interval = mean(max_interval_reached),
+    median_max_interval = median(max_interval_reached),
+    .groups = 'drop'
+  )
 ```
 
-logistic binomial
+Graphs
 ```{r}
-# Fit logistic regression model
-logit_8_4 = glm(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, data   = data, family = binomial(link = "logit"))
-
-summary(logit_8_4)
-
-null_logit_8_4 = glm(W8_4 ~ 1, data = data, family = binomial(link = "logit"))
-
-anova(null_logit_8_4, logit_8_4, test = "Chisq")
-
-#binomial doesn't look good either
+# Graph 1: Overall Success Rate Over Time (Enhanced with Legend)
+ggplot(daily_overall_success, aes(x = DayNum, y = overall_success_rate)) +
+  geom_point(aes(color = "Daily Success Rate"), size = 4, alpha = 0.7) +
+  geom_smooth(aes(color = "Smoothed Trend"), 
+              method = "loess", se = FALSE, linewidth = 1.5) +
+  geom_smooth(aes(color = "Linear Trend"), 
+              method = "lm", se = TRUE, linewidth = 1.2, alpha = 0.2) +
+  scale_color_manual(name = "Legend",
+                     values = c("Daily Success Rate" = "steelblue",
+                               "Smoothed Trend" = "darkblue",
+                               "Linear Trend" = "red")) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), 
+                     limits = c(0.50, 0.70)) +
+  scale_x_continuous(breaks = seq(0, 21, by = 3)) +
+  labs(title = "Speedrun Performance Improvement Over Time",
+       subtitle = "Overall success rate across all intervals by day",
+       x = "Day",
+       y = "Success Rate") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, size = 12, color = "gray30"),
+        panel.grid.minor = element_blank(),
+        axis.title = element_text(face = "bold"),
+        legend.position = "right")
 ```
 
-Negative Binomial
+Models
 ```{r}
-#Negative binomial because its success into success into success that makes it to the last stage
-nb_model = glm.nb(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, data = data)
+#Now that we've shown that there is improvement
+# Model improvement over time on interval completion
+cloglog_time = glm(Success ~ DayNum + factor(Interval), 
+                   data = interval_data, 
+                   family = binomial(link = "cloglog"))
+summary(cloglog_time)
 
-summary(nb_model)
+cloglog_full = glm(Success ~ DayNum * factor(Interval), 
+                   data = interval_data, 
+                   family = binomial(link = "cloglog"))
+
+anova(cloglog_time, cloglog_full, test = "Chisq")
+#saturated model is better so do stepwise to find best AIC
 
 ```
+
+Stepwise
+```{r}
+# Null model (intercept only)
+cloglog_null = glm(Success ~ 1, 
+                   data = interval_data, 
+                   family = binomial(link = "cloglog"))
+
+# Forward stepwise selection
+forward_model = step(cloglog_null, 
+                     scope = list(lower = cloglog_null, upper = cloglog_full),
+                     direction = "forward",
+                     trace = 0)
+
+# Backward stepwise selection
+backward_model = step(cloglog_full,
+                      direction = "backward",
+                      trace = 0)
+
+# Both directions stepwise selection
+both_model = step(cloglog_null,
+                  scope = list(lower = cloglog_null, upper = cloglog_full),
+                  direction = "both",
+                  trace = 0)
+
+best_model = forward_model
+
+summary(best_model)
+#Best model is Success ~ factor(Interval) + DayNum + factor(Inveral):DayNum
+
+```
+
+Find if model is a good fit
+```{r}
+# Analyze best_model fit
+
+cat("P-value:", deviance_gof, "\n")
+cat("Interpretation: p >0.05 indicates good fit\n")
+
+# 3. Pearson Chi-Square Test
+pearson_resid = residuals(best_model, type = "pearson")
+pearson_chisq = sum(pearson_resid^2)
+pearson_pval = 1 - pchisq(pearson_chisq, best_model$df.residual)
+cat("\nPearson Chi-Square Test:\n")
+cat("Chi-Square:", pearson_chisq, "\n")
+cat("P-value:", pearson_pval, "\n")
+
+# 4. Hosmer-Lemeshow Test
+library(ResourceSelection)
+hl_test = hoslem.test(interval_data$Success, fitted(best_model), g = 10)
+print(hl_test)
+cat("Hosmer-Lemeshow: p >0.05 indicates good fit\n")
+
+# 5. McFadden's Pseudo R-squared
+null_dev = best_model$null.deviance
+resid_dev = best_model$deviance
+pseudo_r2 = 1 - (resid_dev / null_dev)
+cat("\nMcFadden's Pseudo R-squared:", pseudo_r2, "\n")
+cat("Interpretation: 0.2-0.4 = excellent fit\n")
+
+# 6. Calculate VIF for multicollinearity (if applicable)
+cat("\nVariance Inflation Factors:\n")
+vif_values = vif(best_model)
+print(vif_values)
+cat("VIF < 10 indicates no serious multicollinearity\n")
+
+# 7. GRAPHS
+
+# Graph 3: Residuals by Interval
+ggplot(interval_data, aes(x = factor(Interval), y = deviance_resid)) +
+  geom_boxplot(fill = "lightblue", alpha = 0.7) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Residuals by Interval",
+       subtitle = "Checking if residuals vary by interval level",
+       x = "Interval",
+       y = "Deviance Residuals") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+#This shows that the interaction term is fine, Interval 3,4,7 might have more to it that my model doesn't capture
+
+
+# Graph 4: Residuals over Time
+ggplot(interval_data, aes(x = DayNum, y = deviance_resid)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_smooth(method = "loess", se = TRUE, color = "darkblue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Residuals Over Time",
+       subtitle = "Checking for temporal patterns",
+       x = "Day",
+       y = "Deviance Residuals") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+# 8. Influential Points
+interval_data$cooks_d = cooks.distance(best_model)
+
+# Graph 5: Cook's Distance
+ggplot(interval_data, aes(x = 1:nrow(interval_data), y = cooks_d)) +
+  geom_bar(stat = "identity", fill = "steelblue", alpha = 0.7) +
+  geom_hline(yintercept = 4/nrow(interval_data), color = "red", 
+             linetype = "dashed", linewidth = 1) +
+  labs(title = "Cook's Distance - Influential Observations",
+       subtitle = "Points above red line may be influential",
+       x = "Observation Index",
+       y = "Cook's Distance") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+# 9. Summary Statistics
+cat("\n=== MODEL FIT SUMMARY ===\n")
+cat("AIC:", AIC(best_model), "\n")
+cat("BIC:", BIC(best_model), "\n")
+cat("Log-Likelihood:", logLik(best_model), "\n")
+cat("Pseudo R-squared:", pseudo_r2, "\n")
+
+```
+
+Fitted vs Actual Graph
+```{r}
+# Better: Direct Actual vs Fitted comparison
+
+# Create a dataset with both actual and fitted values
+comparison_data = interval_data %>%
+  dplyr::select(DayNum, Interval, Success, fitted_prob) %>%
+  arrange(fitted_prob)
+
+# Add observation index
+comparison_data$obs_index = 1:nrow(comparison_data)
+
+#Scatterplot with jitter (simpler, no select needed)
+ggplot(interval_data, aes(x = fitted_prob, y = Success)) +
+  geom_jitter(alpha = 0.3, width = 0, height = 0.05, color = "steelblue") +
+  geom_smooth(method = "loess", se = TRUE, color = "red", linewidth = 1.5) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "darkgreen") +
+  labs(title = "Actual vs Fitted Probabilities",
+       subtitle = "Red line shows actual relationship, green line is perfect prediction",
+       x = "Fitted Probability",
+       y = "Actual Outcome (0 or 1)") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+
+
+
+# Option 2: ROC-style cumulative plot
+interval_data_sorted = interval_data %>%
+  arrange(fitted_prob) %>%
+  mutate(
+    obs_number = row_number(),
+    cumulative_fitted = cummean(fitted_prob),
+    cumulative_actual = cummean(Success)
+  )
+
+ggplot(interval_data_sorted, aes(x = obs_number)) +
+  geom_line(aes(y = cumulative_actual, color = "Actual (Cumulative Avg)"), 
+            linewidth = 1.2) +
+  geom_line(aes(y = cumulative_fitted, color = "Fitted (Cumulative Avg)"), 
+            linewidth = 1.2) +
+  scale_color_manual(name = "Value",
+                     values = c("Actual (Cumulative Avg)" = "red",
+                               "Fitted (Cumulative Avg)" = "blue")) +
+  labs(title = "Cumulative Average: Actual vs Fitted",
+       subtitle = "Observations sorted by fitted probability",
+       x = "Observation (sorted by fitted probability)",
+       y = "Cumulative Average") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        legend.position = "bottom")
+
+```
+
+Use Predicted Success Rate from Interval Model
+```{r}
+best_wr_model = glm(W8_4 ~ success_rate + DayNum,
+                    data = world_data,
+                    family = binomial(link = "cloglog"))
+best_wr_model2 = glm(W8_4 ~  DayNum,
+                    data = world_data,
+                    family = binomial(link = "cloglog"))
+
+summary(best_wr_model)
+summary(best_wr_model2)
+
+
+AIC(best_wr_model)
+
+
+world_data$wr_predicted_prob = predict(best_wr_model, type = "response")
+
+# Example: Predict for perfect run on Day 22
+perfect_run = data.frame(
+  success_rate = 1.0,
+  DayNum = 22
+)
+predict(best_wr_model, newdata = perfect_run, type = "response")
+anova(best_wr_model2, best_)
+
+#SCRAP SUCCESS RATE
+#Predict improvement rate
+
+#To predict improvement rate build models where response is Interval 1, then Interval 2 etc... instead of predicting success
+#Use improvement rate to build model for each level
+#Then make deterministic probability based on these models
+
+#Survivor model based on what we just went over in class, might be an issue that the survivors are really rare, might not be, have to test it
+
+#Censored runs are the WR runs, we are trying to see if his lifetime goes up over time
+
+```
+
 
 ZIP
 ```{r}
@@ -118,7 +386,7 @@ zib_0 = glmmTMB(
   W8_4 ~ 1,        
   ziformula = ~ 1,
   family = binomial(link = logit),
-  data = data
+  data  = world_data 
 )
 
 summary(zib_0)
@@ -127,7 +395,7 @@ zib_full = glmmTMB(
   W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3,        
   ziformula = ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, 
   family = binomial(link = logit),
-  data = data
+  data  = world_data 
 )
 summary(zib_full)
 #no warning but still NAN p values, ZIP doesn't work
@@ -136,35 +404,53 @@ zib_full_2 = glmmTMB(
   W8_4 ~ success_rate,        
   ziformula = ~ success_rate, 
   family = binomial(link = logit),
-  data = data
+  data  = world_data 
 )
 
 summary(zib_full_2) #Even success_rate doesn't work
 ``` 
 
+ZIP with time improvement
+```{r}
+zib_full_2 = glmmTMB(
+  W8_4 ~ success_rate + day_improvement,        
+  ziformula = ~ success_rate + day_improvement, 
+  family = binomial(link = logit),
+  data  = world_data 
+)
+
+summary(zib_full_2) 
+``` 
 
 Firth's bias reduction
 ```{r}
-firth_8_4 = logistf(W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, 
-                     data = data)
-summary(firth_8_4)
-
-firth_simple = logistf(W8_4 ~ success_rate, data = data)
+firth_simple = logistf(W8_4 ~ success_rate, data  = world_data )
 summary(firth_simple) #finally a significant p-val in just using success rate
+
+#With time
+firth_time = logistf(W8_4 ~ success_rate + day_improvement, data  = world_data )
+summary(firth_time)
+
+firth_time_2 = logistf(W8_4 ~ day_improvement, data  = world_data )
+
+summary(firth_time_2)
+
+anova(firth_simple, firth_time)
+
 ```
 Block for testing firth_simple
-Actually a good fit, decent predictions, Nifski has around a 21% completion rate on average for all previous levels. dataset updated with predictions from this.
+Actually a good fit, decent predictions, Nifski has around a 21% completion rate on average for all previous levels. world_data set updated with predictions from this.
 
 ```{r}
-firth_simple = logistf(W8_4 ~ success_rate, data = data)
+firth_simple = logistf(W8_4 ~ success_rate, data  = world_data )
 summary(firth_simple)
 
-# 1. Generate predictions for existing data
-data$predicted_prob = predict(firth_simple, type = "response")
+# 1. Generate predictions for existing world_data 
+world_data $predicted_prob = predict(firth_simple, type = "response")
 
 
 # 2. DIAGNOSTIC PLOT 3: Success rate vs probability curve
-ggplot(data, aes(x = success_rate, y = predicted_prob)) +
+ggplot(world_data , aes(x = success_rate, y = predicted_prob)) +
   geom_point(aes(color = as.factor(W8_4)), alpha = 0.5) +
   geom_smooth(method = "loess", se = TRUE, color = "blue") +
   labs(title = "Success Rate vs Predicted Probability",
@@ -176,347 +462,22 @@ ggplot(data, aes(x = success_rate, y = predicted_prob)) +
   theme_minimal()
 
 # 3.goodness of fit
-hoslem.test(data$W8_4, data$predicted_prob, g = 10)
+hoslem.test(world_data $W8_4, world_data $predicted_prob, g = 10)
 cat("Test: p >0.05 indicates good fit\n")
 
 
-target_row = data[
-  data$W1_1 == 1 &
-  data$W1_2 == 1 &
-  data$W4_1 == 1 &
-  data$W4_2 == 1 &
-  data$W8_1 == 1 &
-  data$W8_2 == 1 &
-  data$W8_3 == 1,
+target_row = world_data [
+  world_data $W1_1 == 1 &
+  world_data $W1_2 == 1 &
+  world_data $W4_1 == 1 &
+  world_data $W4_2 == 1 &
+  world_data $W8_1 == 1 &
+  world_data $W8_2 == 1 &
+  world_data $W8_3 == 1,
 ]
 target_row
+world_data
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Bayesian Start Here
-
-
-```{r}
-#Final model can output probability of WR on next attempt given current performance...
-#This can be used to simulate the Probability of a WR within N attempts 1 - (1 - p_hat)^N
-#bayesian model building
-stages = c("W1_1", "W1_2", "W4_1", "W4_2", "W8_1", "W8_2", "W8_3", "W8_4")
-stage_stats = tibble()
-
-for (k in seq_along(stages)) {
-  stage_name = stages[k]
-  
-  # "Reached" this stage = succeeded on all previous stages
-  if (k == 1) {
-    reached = rep(TRUE, nrow(data))
-  } else {
-    prev_stages = stages[1:(k-1)]
-    reached = apply(data[, prev_stages, drop = FALSE] == 1, 1, all)
-  }
-  
-  n_k = sum(reached)                              # number of attempts that reached this stage
-  y_k = sum(data[[stage_name]][reached] == 1)     # successes at this stage
-  
-  stage_stats = bind_rows(
-    stage_stats,
-    tibble(
-      stage     = stage_name,
-      index     = k,
-      reached_n = n_k,
-      success_y = y_k,
-      p_hat     = ifelse(n_k > 0, y_k / n_k, NA_real_)
-    )
-  )
-}
-
-stage_stats
-
-```
-
-```{r}
-stage_stats %>%
-  ggplot(aes(x = reorder(stage, index), y = p_hat)) +
-  geom_col() +
-  ylim(0, 1) +
-  labs(
-    title = "Empirical Conditional Success Probability by Stage",
-    x = "Stage",
-    y = "Estimated P(success | reached stage)"
-  ) +
-  theme_bw()
-```
-
-```{r}
-alpha0 = 1
-beta0  = 1
-
-stage_stats = stage_stats %>%
-  mutate(
-    alpha_post = alpha0 + success_y,
-    beta_post  = beta0 + reached_n - success_y,
-    mean_post  = alpha_post / (alpha_post + beta_post),
-    lower95    = qbeta(0.025, alpha_post, beta_post),
-    upper95    = qbeta(0.975, alpha_post, beta_post)
-  )
-
-stage_stats
-
-```
-
-```{r}
-
-stage_stats %>%
-  ggplot(aes(x = reorder(stage, index), y = mean_post)) +
-  geom_point(size = 3) +
-  geom_errorbar(aes(ymin = lower95, ymax = upper95), width = 0.2) +
-  ylim(0, 1) +
-  labs(
-    title = "Posterior Success Probability by Stage (Beta-Binomial)",
-    x = "Stage",
-    y = "Posterior mean P(success | reached stage)"
-  ) +
-  theme_bw()
-```
-
-```{r}
-set.seed(123)
-
-n_sims = 100000
-
-# Draw samples from each stage's posterior
-p_draws_list = lapply(seq_len(nrow(stage_stats)), function(i) {
-  a = stage_stats$alpha_post[i]
-  b = stage_stats$beta_post[i]
-  rbeta(n_sims, a, b)
-})
-
-# Convert list to matrix: rows = sims, cols = stages
-p_draws_mat = do.call(cbind, p_draws_list)
-
-# Product across stages for each simulation = WR probability in that simulation
-wr_prob_draws = apply(p_draws_mat, 1, prod)
-
-# Summaries
-wr_summary = tibble(
-  mean       = mean(wr_prob_draws),
-  median     = median(wr_prob_draws),
-  lower95    = quantile(wr_prob_draws, 0.025),
-  upper95    = quantile(wr_prob_draws, 0.975)
-)
-
-wr_summary
-```
-
-```{r}
-tibble(wr_prob = wr_prob_draws) %>%
-  ggplot(aes(x = wr_prob)) +
-  geom_histogram(bins = 50) +
-  labs(
-    title = "Posterior Distribution of WR Probability (Per Attempt)",
-    x = "P(WR on a single attempt)",
-    y = "Frequency"
-  ) +
-  theme_bw()
-```
-
-```{r}
-tibble(log10_wr_prob = log10(wr_prob_draws)) %>%
-  ggplot(aes(x = log10_wr_prob)) +
-  geom_histogram(bins = 50) +
-  labs(
-    title = "Posterior Distribution of log10 WR Probability",
-    x = "log10 P(WR per attempt)",
-    y = "Frequency"
-  ) +
-  theme_bw()
-```
-
-
 
 
 
