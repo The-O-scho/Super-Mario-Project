@@ -6,6 +6,9 @@ output:
   pdf_document:
     toc: false
     number_sections: false
+  html_document:
+    toc: false
+    df_print: paged
 fontsize: 11pt
 geometry: margin=1in
 urlcolor: blue
@@ -31,7 +34,7 @@ Interval world_data
 ```{r}
 interval_data = read.csv("FINAL DATA.csv")
 
-interval_data   
+#interval_data   
 ```
 
 Create world_data 
@@ -39,42 +42,10 @@ Create world_data
 #Read in world_data  (world_data  is ordered)
 world_data   = read.csv("FINAL WORLD DATA.csv")
 
-world_data 
+#world_data 
 ```
 
-<!-- Create time varied world_data  -->
-<!-- ```{r} -->
-<!-- # Create day–level improvement variable -->
 
-<!-- day_summary = world_data  %>% -->
-<!--   group_by(Day) %>% -->
-<!--   summarise( -->
-<!--     day_success_rate = mean(success_rate), -->
-<!--     .groups = "drop" -->
-<!--   ) %>% -->
-
-<!--   mutate( -->
-<!--     time_index = as.numeric(factor(Day)) -->
-<!--   ) %>% -->
-<!--   arrange(time_index) %>% -->
-
-<!--   mutate( -->
-<!--     day_improvement = day_success_rate - lag(day_success_rate), -->
-<!--     day_cum_improvement = day_success_rate - first(day_success_rate) -->
-<!--   ) -->
-
-
-<!-- world_data  = world_data  %>% -->
-<!--   left_join(day_summary, by = "Day") -->
-
-<!-- world_data $day_improvement[is.na(world_data $day_improvement)] = 0 -->
-
-<!-- world_data  -->
-
-<!-- #Graph day_success_rate over time grouped by date to find IF there is improvement over time -->
-
-
-<!-- ``` -->
 Create model for improvement over time
 ```{r}
 interval_data = interval_data   %>%
@@ -115,7 +86,7 @@ daily_progression = interval_data   %>%
     .groups = 'drop'
   )
 
-interval_data
+#interval_data
 ```
 
 Graphs
@@ -199,8 +170,6 @@ Find if model is a good fit
 ```{r}
 # Analyze best_model fit
 
-cat("P-value:", deviance_gof, "\n")
-cat("Interpretation: p >0.05 indicates good fit\n")
 
 # 3. Pearson Chi-Square Test
 pearson_resid = residuals(best_model, type = "pearson")
@@ -229,32 +198,6 @@ vif_values = vif(best_model)
 print(vif_values)
 cat("VIF < 10 indicates no serious multicollinearity\n")
 
-# 7. GRAPHS
-
-# Graph 3: Residuals by Interval
-ggplot(interval_data, aes(x = factor(Interval), y = deviance_resid)) +
-  geom_boxplot(fill = "lightblue", alpha = 0.7) +
-  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
-  labs(title = "Residuals by Interval",
-       subtitle = "Checking if residuals vary by interval level",
-       x = "Interval",
-       y = "Deviance Residuals") +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-#This shows that the interaction term is fine, Interval 3,4,7 might have more to it that my model doesn't capture
-
-
-# Graph 4: Residuals over Time
-ggplot(interval_data, aes(x = DayNum, y = deviance_resid)) +
-  geom_point(alpha = 0.5, color = "steelblue") +
-  geom_smooth(method = "loess", se = TRUE, color = "darkblue") +
-  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
-  labs(title = "Residuals Over Time",
-       subtitle = "Checking for temporal patterns",
-       x = "Day",
-       y = "Deviance Residuals") +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 
 # 8. Influential Points
 interval_data$cooks_d = cooks.distance(best_model)
@@ -280,59 +223,7 @@ cat("Pseudo R-squared:", pseudo_r2, "\n")
 
 ```
 
-Fitted vs Actual Graph
-```{r}
-# Better: Direct Actual vs Fitted comparison
 
-# Create a dataset with both actual and fitted values
-comparison_data = interval_data %>%
-  dplyr::select(DayNum, Interval, Success, fitted_prob) %>%
-  arrange(fitted_prob)
-
-# Add observation index
-comparison_data$obs_index = 1:nrow(comparison_data)
-
-#Scatterplot with jitter (simpler, no select needed)
-ggplot(interval_data, aes(x = fitted_prob, y = Success)) +
-  geom_jitter(alpha = 0.3, width = 0, height = 0.05, color = "steelblue") +
-  geom_smooth(method = "loess", se = TRUE, color = "red", linewidth = 1.5) +
-  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "darkgreen") +
-  labs(title = "Actual vs Fitted Probabilities",
-       subtitle = "Red line shows actual relationship, green line is perfect prediction",
-       x = "Fitted Probability",
-       y = "Actual Outcome (0 or 1)") +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-
-
-
-
-# Option 2: ROC-style cumulative plot
-interval_data_sorted = interval_data %>%
-  arrange(fitted_prob) %>%
-  mutate(
-    obs_number = row_number(),
-    cumulative_fitted = cummean(fitted_prob),
-    cumulative_actual = cummean(Success)
-  )
-
-ggplot(interval_data_sorted, aes(x = obs_number)) +
-  geom_line(aes(y = cumulative_actual, color = "Actual (Cumulative Avg)"), 
-            linewidth = 1.2) +
-  geom_line(aes(y = cumulative_fitted, color = "Fitted (Cumulative Avg)"), 
-            linewidth = 1.2) +
-  scale_color_manual(name = "Value",
-                     values = c("Actual (Cumulative Avg)" = "red",
-                               "Fitted (Cumulative Avg)" = "blue")) +
-  labs(title = "Cumulative Average: Actual vs Fitted",
-       subtitle = "Observations sorted by fitted probability",
-       x = "Observation (sorted by fitted probability)",
-       y = "Cumulative Average") +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
-        legend.position = "bottom")
-
-```
 
 Model to predict probability of each individual run
 ```{r}
@@ -424,6 +315,28 @@ summary(final_model_cloglog)
 world_data %>%
   dplyr::select(DayNum, starts_with("pred_"), W8_4)
 ```
+
+Analyze models
+```{r}
+
+
+```
+
+
+Analyze Results
+```{r}
+plot(world_data$pred_WR_prob)
+plot(world_data$pred_W1_1)
+plot(world_data$pred_W1_2)
+plot(world_data$pred_W4_1)
+plot(world_data$pred_W4_2)
+plot(world_data$pred_W8_1)
+plot(world_data$pred_W8_2)
+plot(world_data$pred_W8_3)
+
+
+```
+
 
 
 
