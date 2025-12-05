@@ -411,7 +411,14 @@ world_data = world_data %>%
 
 # Now use this predicted WR probability in your final model
 final_model = logistf(W8_4 ~ pred_WR_prob, data = world_data)
+
+final_model_cloglog = glm(W8_4 ~ pred_WR_prob, 
+                   data = world_data, 
+                   family = binomial(link = "cloglog"))
+
 summary(final_model)
+summary(final_model_cloglog)
+#should make final pred_WR remain deterministic based on predicted probabilities, because pred_WR_prob isn't stat significant
 
 # Check the predictions
 world_data %>%
@@ -419,129 +426,6 @@ world_data %>%
 ```
 
 
-
-
-Use Predicted Success Rate from Interval Model
-```{r}
-best_wr_model = glm(W8_4 ~ success_rate + DayNum,
-                    data = world_data,
-                    family = binomial(link = "cloglog"))
-#Doesnt work because of success rate
-
-
-#SCRAP SUCCESS RATE
-#Predict improvement rate
-
-#To predict improvement rate build models where response is Interval 1, then Interval 2 etc... instead of predicting success
-#Use improvement rate to build model for each level
-#Then make deterministic probability based on these models
-
-#Survivor model based on what we just went over in class, might be an issue that the survivors are really rare, might not be, have to test it
-
-#Censored runs are the WR runs, we are trying to see if his lifetime goes up over time
-
-```
-
-
-ZIP
-```{r}
-#logistic binomial regression with ZIP 
-zib_0 = glmmTMB(
-  W8_4 ~ 1,        
-  ziformula = ~ 1,
-  family = binomial(link = logit),
-  data  = world_data 
-)
-
-summary(zib_0)
-
-zib_full = glmmTMB(
-  W8_4 ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3,        
-  ziformula = ~ W1_1 + W1_2 + W4_1 + W4_2 + W8_1 + W8_2 + W8_3, 
-  family = binomial(link = logit),
-  data  = world_data 
-)
-summary(zib_full)
-#no warning but still NAN p values, ZIP doesn't work
-
-zib_full_2 = glmmTMB(
-  W8_4 ~ success_rate,        
-  ziformula = ~ success_rate, 
-  family = binomial(link = logit),
-  data  = world_data 
-)
-
-summary(zib_full_2) #Even success_rate doesn't work
-``` 
-
-ZIP with time improvement
-```{r}
-zib_full_2 = glmmTMB(
-  W8_4 ~ success_rate + day_improvement,        
-  ziformula = ~ success_rate + day_improvement, 
-  family = binomial(link = logit),
-  data  = world_data 
-)
-
-summary(zib_full_2) 
-``` 
-
-Firth's bias reduction
-```{r}
-firth_simple = logistf(W8_4 ~ success_rate, data  = world_data )
-summary(firth_simple) #finally a significant p-val in just using success rate
-
-#With time
-firth_time = logistf(W8_4 ~ success_rate + day_improvement, data  = world_data )
-summary(firth_time)
-
-firth_time_2 = logistf(W8_4 ~ day_improvement, data  = world_data )
-
-summary(firth_time_2)
-
-anova(firth_simple, firth_time)
-
-```
-Block for testing firth_simple
-Actually a good fit, decent predictions, Nifski has around a 21% completion rate on average for all previous levels. world_data set updated with predictions from this.
-
-```{r}
-firth_simple = logistf(W8_4 ~ success_rate, data  = world_data )
-summary(firth_simple)
-
-# 1. Generate predictions for existing world_data 
-world_data $predicted_prob = predict(firth_simple, type = "response")
-
-
-# 2. DIAGNOSTIC PLOT 3: Success rate vs probability curve
-ggplot(world_data , aes(x = success_rate, y = predicted_prob)) +
-  geom_point(aes(color = as.factor(W8_4)), alpha = 0.5) +
-  geom_smooth(method = "loess", se = TRUE, color = "blue") +
-  labs(title = "Success Rate vs Predicted Probability",
-       x = "Success Rate (prior levels)",
-       y = "Predicted Probability of World Record",
-       color = "Actual WR") +
-  scale_color_manual(values = c("0" = "red", "1" = "green"),
-                     labels = c("No WR", "WR")) +
-  theme_minimal()
-
-# 3.goodness of fit
-hoslem.test(world_data $W8_4, world_data $predicted_prob, g = 10)
-cat("Test: p >0.05 indicates good fit\n")
-
-
-target_row = world_data [
-  world_data $W1_1 == 1 &
-  world_data $W1_2 == 1 &
-  world_data $W4_1 == 1 &
-  world_data $W4_2 == 1 &
-  world_data $W8_1 == 1 &
-  world_data $W8_2 == 1 &
-  world_data $W8_3 == 1,
-]
-target_row
-world_data
-```
 
 
 
