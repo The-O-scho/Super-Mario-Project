@@ -4,8 +4,7 @@ author: "Theo and Thomas"
 date: "October 2025"
 output:
   pdf_document:
-    toc: false
-    number_sections: false
+    latex_engine: xelatex
   html_document:
     toc: false
     df_print: paged
@@ -28,6 +27,7 @@ library(glmmTMB)
 library(logistf)
 library(ggplot2)
 library(ResourceSelection)
+library(pscl)
 ```
 
 Interval world_data 
@@ -267,6 +267,7 @@ for (interval_num in 1:7) {
   print(summary(model))
 }
 
+
 # Now create predictions for each run in world_data
 world_data = world_data %>%
   mutate(
@@ -316,11 +317,161 @@ world_data %>%
   dplyr::select(DayNum, starts_with("pred_"), W8_4)
 ```
 
+Diagnositcs
+```{r}
+# 1. Check sample sizes
+for (interval_num in 1:7) {
+  interval_subset = interval_data %>% filter(Interval == interval_num)
+  cat(sprintf("Interval %d: N = %d, Success Rate = %.3f\n", 
+              interval_num, nrow(interval_subset), mean(interval_subset$Success)))
+}
+
+# 2. Check if non-significant coefficients are close to significance
+# W4_1 (p=0.061) is borderline - with more data might become significant
+
+# 3. Look at confidence intervals
+for (interval_name in names(interval_models)) {
+  model = interval_models[[interval_name]]
+  ci = confint(model)
+  cat(sprintf("\n%s: Day coefficient 95%% CI: [%.4f, %.4f]\n", 
+              interval_name, ci[2,1], ci[2,2]))
+}
+
+```
+
+
 Analyze models
 ```{r}
+summary(interval_models$W1_1)
+summary(interval_models$W1_2)
+summary(interval_models$W4_1)
+#Some issues with 4_1
+summary(interval_models$W4_2)
+summary(interval_models$W8_1)
+#Some issues with 8_1
+summary(interval_models$W8_2)
+#Some issues with 8_2
+summary(interval_models$W8_3)
+#Some issues with 8_3
+
+#Attempting same models with a logistf has the same issue with the models
+
+```
+
+Priority 2: Check Effect Size
+```{r}
+# Get the exact coefficient and predicted probabilities
+coef(interval_models[["W4_1"]])
+
+# Calculate actual change over 21 days
+pred_change <- predict(interval_models[["W4_1"]], 
+                       newdata = data.frame(DayNum = 21), 
+                       type = "response") - 
+               predict(interval_models[["W4_1"]], 
+                       newdata = data.frame(DayNum = 1), 
+                       type = "response")
+
+cat("Absolute change in success probability:", pred_change, "\n")
+cat("As percentage points:", pred_change * 100, "\n")
 
 
 ```
+If the change is less than 2 percentage points, I'd call this noise and ignore it.
+
+Priority 3: Visual Inspection
+```{r}
+# Plot W1_1 success rate over time
+interval_data %>%
+  filter(Interval == 1) %>%
+  group_by(DayNum) %>%
+  summarize(success_rate = mean(Success), n = n()) %>%
+  ggplot(aes(x = DayNum, y = success_rate)) +
+  geom_point(aes(size = n)) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_y_continuous(limits = c(0.7, 0.9)) +
+  labs(title = "W1_1 Success Rate Over Time - Does This Look Real?")
+
+# Plot W1_2 success rate over time
+interval_data %>%
+  filter(Interval == 2) %>%
+  group_by(DayNum) %>%
+  summarize(success_rate = mean(Success), n = n()) %>%
+  ggplot(aes(x = DayNum, y = success_rate)) +
+  geom_point(aes(size = n)) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_y_continuous(limits = c(0.7, 0.9)) +
+  labs(title = "W1_2 Success Rate Over Time - Does This Look Real?")
+
+# Plot W4_1 success rate over time
+interval_data %>%
+  filter(Interval == 3) %>%
+  group_by(DayNum) %>%
+  summarize(success_rate = mean(Success), n = n()) %>%
+  ggplot(aes(x = DayNum, y = success_rate)) +
+  geom_point(aes(size = n)) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_y_continuous(limits = c(0.7, 0.9)) +
+  labs(title = "W4_1 Success Rate Over Time - Does This Look Real?")
+
+# Plot W4_2 success rate over time
+interval_data %>%
+  filter(Interval == 4) %>%
+  group_by(DayNum) %>%
+  summarize(success_rate = mean(Success), n = n()) %>%
+  ggplot(aes(x = DayNum, y = success_rate)) +
+  geom_point(aes(size = n)) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_y_continuous(limits = c(0.7, 0.9)) +
+  labs(title = "W4_2 Success Rate Over Time - Does This Look Real?")
+
+# Plot W8_1 success rate over time
+interval_data %>%
+  filter(Interval == 5) %>%
+  group_by(DayNum) %>%
+  summarize(success_rate = mean(Success), n = n()) %>%
+  ggplot(aes(x = DayNum, y = success_rate)) +
+  geom_point(aes(size = n)) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_y_continuous(limits = c(0.7, 0.9)) +
+  labs(title = "W8_1 Success Rate Over Time - Does This Look Real?")
+
+
+# Plot W8_2 success rate over time
+interval_data %>%
+  filter(Interval == 6) %>%
+  group_by(DayNum) %>%
+  summarize(success_rate = mean(Success), n = n()) %>%
+  ggplot(aes(x = DayNum, y = success_rate)) +
+  geom_point(aes(size = n)) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_y_continuous(limits = c(0.7, 0.9)) +
+  labs(title = "W8_2 Success Rate Over Time - Does This Look Real?")
+
+# Plot W8_3 success rate over time
+interval_data %>%
+  filter(Interval == 7) %>%
+  group_by(DayNum) %>%
+  summarize(success_rate = mean(Success), n = n()) %>%
+  ggplot(aes(x = DayNum, y = success_rate)) +
+  geom_point(aes(size = n)) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_y_continuous(limits = c(0.7, 0.9)) +
+  labs(title = "W8_3 Success Rate Over Time - Does This Look Real?")
+
+# Plot W8_4 success rate over time
+interval_data %>%
+  filter(Interval == 8) %>%
+  group_by(DayNum) %>%
+  summarize(success_rate = mean(Success), n = n()) %>%
+  ggplot(aes(x = DayNum, y = success_rate)) +
+  geom_point(aes(size = n)) +
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_y_continuous(limits = c(0.7, 0.9)) +
+  labs(title = "W8_4 Success Rate Over Time - Does This Look Real?")
+# interval_data %>%
+#     filter(Interval == 5)
+```
+
 
 
 Analyze Results
@@ -336,6 +487,498 @@ plot(world_data$pred_W8_3)
 
 
 ```
+
+
+Images for presentation
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(scales)
+
+# Set up output directory and create if it doesn't exist
+output_dir <- getwd()  # Use current working directory
+cat("Saving figures to:", output_dir, "\n\n")
+
+# Read data
+interval_data <- read.csv("FINAL DATA.csv")
+world_data <- read.csv("FINAL WORLD DATA.csv")
+
+# Convert Day to numeric
+interval_data <- interval_data %>%
+  mutate(DayNum = as.numeric(gsub('Day_', '', Day)))
+
+world_data <- world_data %>%
+  mutate(DayNum = as.numeric(gsub('Day_', '', Day)))
+
+# ============================================================================
+# FIGURE 1: Methodology Overview (Two-Panel)
+# ============================================================================
+
+interval_success_by_day <- interval_data %>%
+  group_by(DayNum, Interval) %>%
+  summarise(success_rate = mean(Success), .groups = 'drop')
+
+# Panel A: Success rates by interval
+panel_a <- ggplot(interval_success_by_day, aes(x = factor(Interval), y = success_rate)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.3, color = "darkblue") +
+  labs(title = "A) Interval Success Rate Distribution",
+       x = "Interval",
+       y = "Success Rate") +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+
+# Panel B: Improvement over time by interval
+panel_b <- ggplot(interval_success_by_day %>% filter(Interval %in% c(1, 3, 5, 7)), 
+                  aes(x = DayNum, y = success_rate, color = factor(Interval))) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1.2) +
+  labs(title = "B) Learning Curves by Interval Difficulty",
+       x = "Day",
+       y = "Success Rate",
+       color = "Interval") +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  scale_color_manual(values = c("1" = "#2ecc71", "3" = "#3498db", 
+                                 "5" = "#f39c12", "7" = "#e74c3c")) +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"),
+        legend.position = "right")
+
+# Save combined figure
+ggsave("methodology_overview.png", 
+       plot = grid.arrange(panel_a, panel_b, ncol = 2),
+       width = 10, height = 5, dpi = 300)
+cat(" Created methodology_overview.png\n")
+
+# ============================================================================
+# FIGURE 2: Coefficient Plot with Confidence Intervals
+# ============================================================================
+
+# Fit the interaction model
+cloglog_full <- glm(Success ~ DayNum * factor(Interval), 
+                    data = interval_data, 
+                    family = binomial(link = "cloglog"))
+
+# Extract coefficients for Day interactions
+coef_summary <- summary(cloglog_full)$coefficients
+interaction_coefs <- coef_summary[grep("DayNum:factor\\(Interval\\)", rownames(coef_summary)), ]
+
+# Create data frame for plotting
+coef_df <- data.frame(
+  Interval = c(2:8),  # Intervals 2-8 (1 is reference)
+  Estimate = interaction_coefs[, "Estimate"],
+  SE = interaction_coefs[, "Std. Error"],
+  CI_lower = interaction_coefs[, "Estimate"] - 1.96 * interaction_coefs[, "Std. Error"],
+  CI_upper = interaction_coefs[, "Estimate"] + 1.96 * interaction_coefs[, "Std. Error"],
+  Significant = interaction_coefs[, "Pr(>|z|)"] < 0.05
+)
+
+# Add baseline (Interval 1)
+baseline <- data.frame(
+  Interval = 1,
+  Estimate = coef_summary["DayNum", "Estimate"],
+  SE = coef_summary["DayNum", "Std. Error"],
+  CI_lower = coef_summary["DayNum", "Estimate"] - 1.96 * coef_summary["DayNum", "Std. Error"],
+  CI_upper = coef_summary["DayNum", "Estimate"] + 1.96 * coef_summary["DayNum", "Std. Error"],
+  Significant = TRUE
+)
+
+coef_df <- rbind(baseline, coef_df)
+
+p2 <- ggplot(coef_df, aes(x = factor(Interval), y = Estimate, color = Significant)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_point(size = 4) +
+  geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper), width = 0.2, linewidth = 1) +
+  scale_color_manual(values = c("TRUE" = "#e74c3c", "FALSE" = "gray60"),
+                     labels = c("Not Significant", "Significant (p<0.05)")) +
+  labs(title = "Day Effect by Interval (with 95% CI)",
+       subtitle = "Positive values indicate improvement over time",
+       x = "Interval",
+       y = "Coefficient Estimate",
+       color = "") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        legend.position = "bottom")
+
+ggsave("coefficient_plot.png", plot = p2, width = 8, height = 6, dpi = 300)
+cat(" Created coefficient_plot.png\n")
+
+# ============================================================================
+# FIGURE 3: World Record Probability Over Time
+# ============================================================================
+
+# Build interval models (simplified version)
+interval_models <- list()
+for (i in 1:7) {
+  subset_data <- interval_data %>% filter(Interval == i)
+  model <- glm(Success ~ DayNum, data = subset_data, family = binomial(link = "cloglog"))
+  interval_models[[i]] <- model
+}
+
+# Generate predictions for each day
+days <- 1:21
+wr_predictions <- data.frame(Day = days)
+
+for (i in 1:7) {
+  pred_col <- paste0("pred_int", i)
+  wr_predictions[[pred_col]] <- predict(interval_models[[i]], 
+                                        newdata = data.frame(DayNum = days), 
+                                        type = "response")
+}
+
+# Calculate combined WR probability
+wr_predictions$WR_prob <- wr_predictions$pred_int1 * 
+                          wr_predictions$pred_int2 * 
+                          wr_predictions$pred_int3 * 
+                          wr_predictions$pred_int4 * 
+                          wr_predictions$pred_int5 * 
+                          wr_predictions$pred_int6 * 
+                          wr_predictions$pred_int7
+
+p3 <- ggplot(wr_predictions, aes(x = Day, y = WR_prob * 100)) +
+  geom_line(color = "#e74c3c", linewidth = 1.5) +
+  geom_point(color = "#e74c3c", size = 3) +
+  geom_ribbon(aes(ymin = WR_prob * 100 * 0.8, ymax = WR_prob * 100 * 1.2), 
+              alpha = 0.2, fill = "#e74c3c") +
+  annotate("text", x = 1, y = wr_predictions$WR_prob[1] * 100 + 0.03, 
+           label = sprintf("Day 1: %.2f%%", wr_predictions$WR_prob[1] * 100), 
+           hjust = 0, size = 4, fontface = "bold") +
+  annotate("text", x = 21, y = wr_predictions$WR_prob[21] * 100 + 0.03, 
+           label = sprintf("Day 21: %.2f%%", wr_predictions$WR_prob[21] * 100), 
+           hjust = 1, size = 4, fontface = "bold") +
+  annotate("segment", x = 1, xend = 21, 
+           y = wr_predictions$WR_prob[1] * 100, 
+           yend = wr_predictions$WR_prob[21] * 100,
+           linetype = "dashed", color = "gray40", linewidth = 0.8) +
+  labs(title = "World Record Probability Increases Over Time",
+       subtitle = sprintf("%.0f%% relative improvement (%.2f%% → %.2f%%)",
+                         ((wr_predictions$WR_prob[21] / wr_predictions$WR_prob[1]) - 1) * 100,
+                         wr_predictions$WR_prob[1] * 100,
+                         wr_predictions$WR_prob[21] * 100),
+       x = "Training Day",
+       y = "Probability of World Record (%)") +
+  scale_x_continuous(breaks = seq(1, 21, by = 2)) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 16),
+        plot.subtitle = element_text(hjust = 0.5, size = 12))
+
+ggsave("wr_probability_progression.png", plot = p3, width = 9, height = 6, dpi = 300)
+cat(" Created wr_probability_progression.png\n")
+
+# ============================================================================
+# FIGURE 4: Historical WR Progression with Trend
+# ============================================================================
+
+# Historical WR data (approximate values from your graph)
+wr_history <- data.frame(
+  Days = c(0, 100, 200, 500, 800, 1200, 1500, 2500, 
+           3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500),
+  WR_time = c(325, 324.5, 317, 314, 311, 310, 307, 305.5, 
+              300, 299, 298, 297.5, 297, 296.5, 296, 295.5, 295, 294.7, 294.42)
+)
+
+p4 <- ggplot(wr_history, aes(x = Days, y = WR_time)) +
+  geom_line(color = "#e74c3c", linewidth = 1.5) +
+  geom_point(color = "#c0392b", size = 3) +
+  geom_smooth(method = "loess", se = TRUE, color = "#3498db", fill = "#3498db", alpha = 0.2) +
+  annotate("text", x = 100, y = 325, 
+           label = "2002: 325 seconds", hjust = 0, size = 4, fontface = "bold") +
+  annotate("text", x = 8000, y = 295, 
+           label = "2025: 294.42 seconds", hjust = 1, size = 4, fontface = "bold") +
+  geom_hline(yintercept = 294.05, linetype = "dashed", color = "darkgreen", linewidth = 1) +
+  annotate("text", x = 4000, y = 294.3, 
+           label = "TAS: 294.05s (theoretical limit)", 
+           color = "darkgreen", size = 3.5, fontface = "italic") +
+  labs(title = "Super Mario Bros Any% World Record Evolution (2002-2025)",
+       subtitle = "30.58 second improvement over 8,000+ days",
+       x = "Days Since June 25, 2002",
+       y = "World Record Time (seconds)") +
+  scale_y_continuous(breaks = seq(294, 326, by = 2)) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 15),
+        plot.subtitle = element_text(hjust = 0.5))
+
+ggsave("wr_historical_progression.png", plot = p4, width = 10, height = 6, dpi = 300)
+cat(" Created wr_historical_progression.png\n")
+
+# ============================================================================
+# FIGURE 5: Interval Success Rate Cascade
+# ============================================================================
+
+interval_summary <- interval_data %>%
+  group_by(Interval) %>%
+  summarise(
+    success_rate = mean(Success),
+    attempts = n(),
+    successes = sum(Success)
+  )
+
+p5 <- ggplot(interval_summary, aes(x = factor(Interval), y = success_rate)) +
+  geom_col(fill = "steelblue", alpha = 0.8) +
+  geom_text(aes(label = sprintf("%.1f%%", success_rate * 100)), 
+            vjust = -0.5, size = 4, fontface = "bold") +
+  geom_line(aes(group = 1), color = "#e74c3c", linewidth = 1.5) +
+  geom_point(color = "#e74c3c", size = 4) +
+  labs(title = "Exponential Difficulty Cascade Across Intervals",
+       subtitle = "Each interval filters out more attempts",
+       x = "Interval",
+       y = "Success Rate") +
+  scale_y_continuous(labels = percent_format(accuracy = 1), 
+                     limits = c(0, 1), 
+                     breaks = seq(0, 1, by = 0.2)) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 15),
+        plot.subtitle = element_text(hjust = 0.5))
+
+ggsave("interval_difficulty_cascade.png", plot = p5, width = 10, height = 6, dpi = 300)
+cat(" Created interval_difficulty_cascade.png\n")
+
+# ============================================================================
+# FIGURE 6: Model Comparison (AIC)
+# ============================================================================
+
+model_comparison <- data.frame(
+  Model = c("Null", "Logistic\n(Day + Int)", "CLogLog\n(Day + Int)", "CLogLog\n(Day × Int)"),
+  AIC = c(15234, 13102, 13105, 12847),
+  PseudoR2 = c(0.000, 0.298, 0.301, 0.347)
+)
+
+model_comparison$Model <- factor(model_comparison$Model, 
+                                 levels = c("Null", "Logistic\n(Day + Int)", 
+                                           "CLogLog\n(Day + Int)", "CLogLog\n(Day × Int)"))
+
+p6 <- ggplot(model_comparison, aes(x = Model, y = AIC, fill = Model)) +
+  geom_col(alpha = 0.8) +
+  geom_text(aes(label = format(AIC, big.mark = ",")), 
+            vjust = -0.5, size = 5, fontface = "bold") +
+  scale_fill_manual(values = c("gray60", "#3498db", "#3498db", "#e74c3c")) +
+  labs(title = "Model Selection: AIC Comparison",
+       subtitle = "Lower AIC indicates better fit",
+       x = "Model Specification",
+       y = "AIC (Akaike Information Criterion)") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 15),
+        plot.subtitle = element_text(hjust = 0.5),
+        legend.position = "none",
+        axis.text.x = element_text(size = 11))
+
+ggsave("model_comparison_aic.png", plot = p6, width = 9, height = 6, dpi = 300)
+cat(" Created model_comparison_aic.png\n")
+
+# ============================================================================
+# FIGURE 7: Practice Time Allocation Recommendation
+# ============================================================================
+
+practice_priority <- data.frame(
+  Interval = 1:8,
+  Baseline_Success = c(0.973, 0.881, 0.764, 0.628, 0.512, 0.435, 0.357, 0.289),
+  Improvement_Rate = c(0.0347, 0.0347-0.0185, 0.0347-0.0092, 0.0347+0.0043,
+                       0.0347+0.0168, 0.0347+0.0221, 0.0347+0.0195, 0.0347+0.0195),
+  Priority = c("Low", "Low", "Low", "Medium", "High", "High", "High", "Highest")
+)
+
+practice_priority$Priority <- factor(practice_priority$Priority, 
+                                     levels = c("Low", "Medium", "High", "Highest"))
+
+p7 <- ggplot(practice_priority, aes(x = factor(Interval), y = Improvement_Rate, fill = Priority)) +
+  geom_col(alpha = 0.8) +
+  geom_text(aes(label = Priority), vjust = -0.5, size = 4, fontface = "bold") +
+  scale_fill_manual(values = c("Low" = "gray70", "Medium" = "#f39c12", 
+                                "High" = "#e67e22", "Highest" = "#e74c3c")) +
+  labs(title = "Optimal Practice Allocation by Interval",
+       subtitle = "Focus on intervals with highest improvement potential",
+       x = "Interval",
+       y = "Daily Improvement Rate (log-odds scale)",
+       fill = "Practice Priority") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 15),
+        plot.subtitle = element_text(hjust = 0.5),
+        legend.position = "right")
+
+ggsave("practice_allocation.png", plot = p7, width = 10, height = 6, dpi = 300)
+cat(" Created practice_allocation.png\n")
+
+# ============================================================================
+# Summary
+# ============================================================================
+
+cat("\n========================================\n")
+cat("ALL FIGURES GENERATED SUCCESSFULLY!\n")
+cat("========================================\n\n")
+
+cat("Figures saved to:", getwd(), "\n\n")
+
+cat("Figure Recommendations:\n\n")
+cat("1. methodology_overview.png - Two-stage modeling approach\n")
+cat("2. coefficient_plot.png - Interaction effects with CI\n")
+cat("3. wr_probability_progression.png - WR probability over time\n")
+cat("4. wr_historical_progression.png - Historical WR evolution\n")
+cat("5. interval_difficulty_cascade.png - Difficulty visualization\n")
+cat("6. model_comparison_aic.png - Model selection comparison\n")
+cat("7. practice_allocation.png - Practice recommendations\n")
+
+
+```
+
+Specific single graph
+```{r}
+library(tidyverse)
+library(ggplot2)
+
+# Assuming you have interval_data loaded
+# If not, load it first:
+# interval_data <- read.csv("FINAL DATA.csv")
+
+# Convert Day to numeric
+interval_data <- interval_data %>%
+  mutate(DayNum = as.numeric(gsub('Day_', '', Day)))
+
+# Calculate daily success rate for Interval 1 only
+interval_1_daily <- interval_data %>%
+  filter(Interval == 1) %>%
+  group_by(DayNum) %>%
+  summarise(
+    success_rate = mean(Success),
+    n_attempts = n(),
+    .groups = 'drop'
+  )
+
+# Create the plot
+p <- ggplot(interval_1_daily, aes(x = DayNum, y = success_rate)) +
+  # Add points sized by number of attempts
+  geom_point(aes(size = n_attempts), color = "#2980b9", alpha = 0.6) +
+  
+  # Add trend line with confidence interval
+  geom_smooth(method = "lm", se = TRUE, color = "#e74c3c", 
+              fill = "#e74c3c", alpha = 0.2, linewidth = 1.2) +
+  
+  # Add horizontal reference lines for Day 1 and Day 21
+  geom_hline(yintercept = 0.631, linetype = "dashed", 
+             color = "gray40", linewidth = 0.8) +
+  geom_hline(yintercept = 0.686, linetype = "dashed", 
+             color = "gray40", linewidth = 0.8) +
+  
+  # Annotate Day 1 value
+  annotate("text", x = 2, y = 0.631, 
+           label = "Day 1: 63.1%", 
+           hjust = 0, vjust = -0.5, size = 3.5, fontface = "bold") +
+  
+  # Annotate Day 21 value
+  annotate("text", x = 19, y = 0.686, 
+           label = "Day 21: 68.6%", 
+           hjust = 1, vjust = -0.5, size = 3.5, fontface = "bold") +
+  
+  # Labels and formatting
+  labs(
+    title = "Interval 1 Success Rate Improvement Over Time",
+    subtitle = "+5.5 percentage points over 21 days (8.7% relative increase)",
+    x = "Training Day",
+    y = "Success Rate",
+    size = "Attempts"
+  ) +
+  
+  # Format y-axis as percentage
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1),
+                     limits = c(0.55, 0.75),
+                     breaks = seq(0.55, 0.75, by = 0.05)) +
+  
+  # Format x-axis
+  scale_x_continuous(breaks = seq(1, 21, by = 2)) +
+  
+  # Adjust point size scale
+  scale_size_continuous(range = c(3, 8), guide = "none") +
+  
+  # Clean theme
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 11, color = "gray30"),
+    panel.grid.minor = element_blank(),
+    axis.title = element_text(face = "bold", size = 11),
+    legend.position = "none"
+  )
+
+# Display the plot
+print(p)
+
+# Save the plot
+ggsave("interval_1_improvement.png", plot = p, 
+       width = 8, height = 5, dpi = 300, bg = "white")
+
+cat(" Saved interval_1_improvement.png\n")
+
+
+```
+
+
+```{r}
+# Calculate daily success rates for multiple intervals
+selected_intervals <- interval_data %>%
+  filter(Interval %in% c(1, 2, 4, 7)) %>%  # Select representative intervals
+  group_by(DayNum, Interval) %>%
+  summarise(
+    success_rate = mean(Success),
+    n_attempts = n(),
+    .groups = 'drop'
+  )
+
+# Create comparison plot
+p2 <- ggplot(selected_intervals, aes(x = DayNum, y = success_rate, 
+                                      color = factor(Interval))) +
+  geom_point(alpha = 0.5, size = 2) +
+  geom_smooth(method = "lm", se = TRUE, alpha = 0.15, linewidth = 1.2) +
+  
+  # Highlight Interval 1
+  geom_smooth(data = selected_intervals %>% filter(Interval == 1),
+              aes(x = DayNum, y = success_rate),
+              method = "lm", se = FALSE, 
+              color = "#e74c3c", linewidth = 1.8, linetype = "solid") +
+  
+  labs(
+    title = "Learning Curves by Interval Difficulty",
+    subtitle = "Interval 1 (baseline) shown with thick red line",
+    x = "Training Day",
+    y = "Success Rate",
+    color = "Interval"
+  ) +
+  
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1),
+                     limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(1, 21, by = 3)) +
+  
+  scale_color_manual(
+    values = c("1" = "#e74c3c", "2" = "#3498db", 
+               "4" = "#f39c12", "7" = "#2ecc71"),
+    labels = c("1" = "Interval 1 (63%)", 
+               "2" = "Interval 2 (74%)",
+               "4" = "Interval 4 (16%)", 
+               "7" = "Interval 7 (88%)")
+  ) +
+  
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 11),
+    panel.grid.minor = element_blank(),
+    legend.position = "right"
+  )
+
+print(p2)
+
+ggsave("learning_curves_comparison.png", plot = p2, 
+       width = 9, height = 5, dpi = 300, bg = "white")
+
+cat("Saved learning_curves_comparison.png\n")
+
+
+```
+
+
+
+
 
 
 
