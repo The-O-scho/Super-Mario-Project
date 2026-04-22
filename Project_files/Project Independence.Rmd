@@ -1,0 +1,169 @@
+---
+title: "Project Independence"
+author: "Theo Schouten"
+date: "2026-03-06"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, echo=FALSE}
+# ============================================================================
+# Lagged Logistic Regression Test for Independence Between Trials
+# Tests whether the previous trial's outcome predicts the current trial
+# If the lag term is significant, trials are not independent
+# ============================================================================
+
+library(tidyverse)
+
+# --- 1. Load and Clean Data ---------------------------------------------------
+
+data <- read.csv("Current training csv.csv", stringsAsFactors = FALSE)
+
+data <- data %>%
+  select(-considerations) %>%
+  filter(!is.na(Success))
+
+data$Success <- as.integer(data$Success)
+data$Trick   <- as.factor(data$Trick)
+
+# Remove the single erroneous "fast accel " entry
+data <- data %>% filter(Trick != "fast accel ")
+
+# --- 2. Create Lagged Variable Within Each Trick -----------------------------
+# For each trick, the lag is the previous trial's outcome.
+# The first trial of each trick has no lag and is dropped.
+#
+# Logic: If the previous outcome predicts the current outcome,
+# then the trials are not independent.
+
+data <- data %>%
+  group_by(Trick) %>%
+  mutate(Lag_Success = lag(Success, n = 1)) %>%
+  ungroup()
+
+# Drop rows with no lag (first trial per trick)
+data_lagged <- data %>% filter(!is.na(Lag_Success))
+
+data_lagged$Lag_Success <- as.factor(data_lagged$Lag_Success)
+
+cat("Observations with valid lag:", nrow(data_lagged), "\n\n")
+
+# --- 3. Overall Lagged Model --------------------------------------------------
+# Tests whether the previous trial's outcome predicts the current one
+# across all tricks pooled together.
+
+cat("=== Overall Lagged Logistic Regression ===\n")
+cat("H0: Previous outcome does not predict current outcome (independent trials)\n")
+cat("H1: Previous outcome predicts current outcome (dependent trials)\n\n")
+
+model_no_lag  <- glm(Success ~ Trick,
+                     data = data_lagged, family = binomial(link = "logit"))
+
+model_with_lag <- glm(Success ~ Trick + Lag_Success,
+                      data = data_lagged, family = binomial(link = "logit"))
+
+# Likelihood ratio test: does adding the lag improve the model?
+lr_test <- anova(model_no_lag, model_with_lag, test = "Chisq")
+cat("Likelihood Ratio Test — Adding Lag Term:\n")
+print(lr_test)
+
+cat("\n--- Lag Coefficient from Full Model ---\n")
+lag_coef <- summary(model_with_lag)$coefficients["Lag_Success1", ]
+cat(sprintf("Lag Estimate:  %0.4f\n", lag_coef["Estimate"]))
+cat(sprintf("Std. Error:    %0.4f\n", lag_coef["Std. Error"]))
+cat(sprintf("z value:       %0.4f\n", lag_coef["z value"]))
+cat(sprintf("p-value:       %0.4f\n", lag_coef["Pr(>|z|)"]))
+
+if (lag_coef["Pr(>|z|)"] < 0.05) {
+  cat("\nConclusion: The lag term IS significant — previous trial outcome\n")
+  cat("predicts the current one. Trials are NOT independent overall.\n")
+} else {
+  cat("\nConclusion: The lag term is NOT significant — no evidence that the\n")
+  cat("previous trial outcome predicts the current one. Trials appear independent.\n")
+}
+
+# --- 4. Trick-by-Trick Lagged Models -----------------------------------------
+# Fit a separate lagged logistic regression for each trick to see
+# if dependence exists within specific tricks.
+
+cat("\n\n=== Trick-by-Trick Lagged Logistic Regression ===\n")
+cat("For each trick: Success ~ Lag_Success (logit link)\n\n")
+
+tricks <- levels(droplevels(data_lagged$Trick))
+
+results <- data.frame(
+  Trick        = character(),
+  n            = integer(),
+  Lag_Estimate = numeric(),
+  Std_Error    = numeric(),
+  z_value      = numeric(),
+  p_value      = numeric(),
+  conclusion   = character(),
+  stringsAsFactors = FALSE
+)
+
+for (trick in tricks) {
+  
+  subset <- data_lagged %>% filter(Trick == trick)
+  n      <- nrow(subset)
+  
+  # Need enough data and variation in both Success and Lag
+  if (n < 10 ||
+      length(unique(subset$Success)) < 2 ||
+      length(unique(subset$Lag_Success)) < 2) {
+    cat(sprintf("%-20s  n = %3d  — Skipped (insufficient data or no variation)\n",
+                trick, n))
+    next
+  }
+  
+  model <- glm(Success ~ Lag_Success,
+               data = subset, family = binomial(link = "logit"))
+  
+  coefs <- summary(model)$coefficients
+  
+  if ("Lag_Success1" %in% rownames(coefs)) {
+    lag_row    <- coefs["Lag_Success1", ]
+    conclusion <- ifelse(lag_row["Pr(>|z|)"] < 0.05,
+                         "DEPENDENT (reject H0)",
+                         "Independent (fail to reject H0)")
+    
+    results <- rbind(results, data.frame(
+      Trick        = trick,
+      n            = n,
+      Lag_Estimate = round(lag_row["Estimate"], 4),
+      Std_Error    = round(lag_row["Std. Error"], 4),
+      z_value      = round(lag_row["z value"], 4),
+      p_value      = round(lag_row["Pr(>|z|)"], 4),
+      conclusion   = conclusion
+    ))
+  }
+}
+
+print(results, right = FALSE)
+
+
+cat("\n=== Summary ===\n")
+n_tested      <- nrow(results)
+n_dependent   <- sum(results$p_value < 0.05)
+n_independent <- n_tested - n_dependent
+
+cat(sprintf("Tricks tested: %d\n", n_tested))
+cat(sprintf("Independent (p >= 0.05): %d\n", n_independent))
+cat(sprintf("Dependent (p < 0.05):    %d\n", n_dependent))
+
+if (n_dependent == 0) {
+  cat("\nConclusion: No evidence that previous trial outcomes predict current\n")
+  cat("outcomes for any trick. Trials appear independent.\n")
+} else {
+  cat("\nTricks showing dependence (previous outcome predicts current):\n")
+  print(results %>% filter(p_value < 0.05) %>% select(Trick, Lag_Estimate, p_value))
+}
+
+```
+
